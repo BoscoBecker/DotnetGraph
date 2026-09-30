@@ -35,21 +35,11 @@ When you click a node (circle), the side panel shows:
 | [Namespaces](docs/screenshots/namespaces.png) | Namespace clusters |
 | [Types](docs/screenshots/types.png) | Type graph for the project |
 
-<p align="center">
-  <img src="docs/screenshots/architecture-detail.png" alt="Architecture with detail panel" width="720"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/call-graph.png" alt="Call Graph" width="720"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/namespaces.png" alt="Namespace map" width="720"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/types.png" alt="Type graph" width="720"/>
-</p>
+<img width="1582" height="917" alt="image" src="https://github.com/user-attachments/assets/10ca342e-9867-4750-b58a-d41ae93cb617" />
+<img width="1568" height="910" alt="image" src="https://github.com/user-attachments/assets/fc604781-209f-4c28-8735-d3fa72e63163" />
+<img width="1579" height="912" alt="image" src="https://github.com/user-attachments/assets/46f4078f-d19a-47d9-ba00-cf245cb969e3" />
+<img width="1584" height="912" alt="image" src="https://github.com/user-attachments/assets/274e4bb1-6542-418f-b244-a11522248efa" />
+<img width="1584" height="910" alt="image" src="https://github.com/user-attachments/assets/04e40a1c-4185-495e-80a0-9cb11da78e40" />
 
 > **Images in the repo:** if `docs/screenshots/*.png` is missing after clone, run `tools\copy-screenshots.cmd` from the repo root (or copy the PNG files into `docs\screenshots\` manually).
 
