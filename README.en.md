@@ -18,9 +18,6 @@ When you click a node (circle), the side panel shows:
 
 1. [Install](#install) the `.vsix` and open a solution with `.csproj`, `.fsproj`, or `.vbproj` projects.
 2. In **Solution Explorer**, **right-click the solution** (root node) and choose **Dotnet Graph**.
-
-   ![Open Dotnet Graph from the solution context menu](docs/screenshots/architecture.png)
-
    **Alternative:** **View → Dotnet Graph**.
 3. Click **Refresh** if the graph has not loaded yet.
 4. Switch between **Architecture**, **Call Graph**, **Namespaces**, and **Types**; export the current view with **PNG** or **Mermaid** in the toolbar.
