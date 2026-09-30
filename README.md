@@ -18,9 +18,7 @@ Ao clicar em um nó (círculo), o painel lateral mostra:
 
 1. [Instale](#instalar) o `.vsix` e abra uma solução com projetos `.csproj`, `.fsproj` ou `.vbproj`.
 2. No **Solution Explorer**, **clique com o botão direito na solução** (nó raiz) e escolha **Dotnet Graph**.
-
-   ![Abrir Dotnet Graph pelo menu de contexto da solução](docs/screenshots/architecture.png)
-
+   
    **Alternativa:** menu **View → Dotnet Graph**.
 3. Clique em **Atualizar** se o grafo ainda não carregou.
 4. Use as visões **Arquitetura**, **Call Graph**, **Namespaces** e **Types**; exporte com **PNG** ou **Mermaid** na barra superior.
@@ -35,21 +33,12 @@ Ao clicar em um nó (círculo), o painel lateral mostra:
 | [Namespaces](docs/screenshots/namespaces.png) | Clusters por namespace |
 | [Types](docs/screenshots/types.png) | Grafo de tipos do projeto |
 
-<p align="center">
-  <img src="docs/screenshots/architecture-detail.png" alt="Arquitetura com painel de detalhes" width="720"/>
-</p>
+<img width="1582" height="917" alt="image" src="https://github.com/user-attachments/assets/10ca342e-9867-4750-b58a-d41ae93cb617" />
+<img width="1568" height="910" alt="image" src="https://github.com/user-attachments/assets/fc604781-209f-4c28-8735-d3fa72e63163" />
+<img width="1579" height="912" alt="image" src="https://github.com/user-attachments/assets/46f4078f-d19a-47d9-ba00-cf245cb969e3" />
+<img width="1584" height="912" alt="image" src="https://github.com/user-attachments/assets/274e4bb1-6542-418f-b244-a11522248efa" />
+<img width="1584" height="910" alt="image" src="https://github.com/user-attachments/assets/04e40a1c-4185-495e-80a0-9cb11da78e40" />
 
-<p align="center">
-  <img src="docs/screenshots/call-graph.png" alt="Call Graph" width="720"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/namespaces.png" alt="Mapa de namespaces" width="720"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/types.png" alt="Grafo de tipos" width="720"/>
-</p>
 
 > **Imagens no repositório:** se `docs/screenshots/*.png` ainda não existir após o clone, execute `tools\copy-screenshots.cmd` na raiz (ou copie manualmente os PNGs para `docs\screenshots\`).
 
