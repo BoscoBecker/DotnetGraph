@@ -30,6 +30,38 @@
 
 
 
+html.theme-hc {
+
+  --dg-bg: #000000;
+
+  --dg-surface: #000000;
+
+  --dg-border: #ffffff;
+
+  --dg-card-border: #ffffff;
+
+  --dg-text: #ffffff;
+
+  --dg-edge: #ffffff;
+
+  --dg-edge-head: #ffff00;
+
+  --dg-node-fill: #000000;
+
+  --dg-node-label: #ffffff;
+
+  --dg-node-sub: #ffffff;
+
+  --dg-accent: #ffff00;
+
+  --dg-cycle-edge: #ff0000;
+
+  --dg-status-bg: #000000;
+
+}
+
+
+
 html.theme-dark {
 
   --dg-bg: #1e1e1e;
@@ -74,9 +106,13 @@ body {
 
   overflow: hidden;
 
-  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-family: "Cascadia UI Variable", "Cascadia UI", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
 
   background: var(--dg-bg);
+
+  display: flex;
+
+  flex-direction: column;
 
 }
 
@@ -129,6 +165,8 @@ body {
   gap: 6px;
 
   flex-shrink: 0;
+
+  pointer-events: auto;
 
 }
 
@@ -212,13 +250,39 @@ body {
 
 
 
+.badge.dimmed {
+
+  opacity: 0.5;
+
+}
+
+
+
+#graphViewport {
+
+  flex: 1;
+
+  min-height: 0;
+
+  overflow-x: auto;
+
+  overflow-y: auto;
+
+  position: relative;
+
+  margin-bottom: 28px;
+
+}
+
+
+
 #graphCanvas {
 
-  width: 100%;
-
-  height: calc(100% - 28px);
-
   display: block;
+
+  height: 100%;
+
+  min-height: 120px;
 
 }
 

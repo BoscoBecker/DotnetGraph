@@ -23,13 +23,13 @@ internal static class SolutionProjectCollector
 
         foreach (Project project in dte.Solution.Projects)
         {
-            CollectProject(project, results);
+            CollectProject(project, results, string.Empty);
         }
 
         return results;
     }
 
-    private static void CollectProject(Project project, List<SolutionProjectInput> results)
+    private static void CollectProject(Project project, List<SolutionProjectInput> results, string folderPath)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
@@ -40,11 +40,18 @@ internal static class SolutionProjectCollector
                 return;
             }
 
+            var folderName = project.Name ?? string.Empty;
+            var nestedFolder = string.IsNullOrWhiteSpace(folderPath)
+                ? folderName
+                : string.IsNullOrWhiteSpace(folderName)
+                    ? folderPath
+                    : folderPath + "\\" + folderName;
+
             foreach (ProjectItem item in project.ProjectItems)
             {
                 if (item.SubProject is not null)
                 {
-                    CollectProject(item.SubProject, results);
+                    CollectProject(item.SubProject, results, nestedFolder);
                 }
             }
 
@@ -65,7 +72,8 @@ internal static class SolutionProjectCollector
         results.Add(new SolutionProjectInput
         {
             Name = project.Name ?? Path.GetFileNameWithoutExtension(project.FullName),
-            FullPath = project.FullName
+            FullPath = project.FullName,
+            SolutionFolderPath = folderPath ?? string.Empty
         });
     }
 }

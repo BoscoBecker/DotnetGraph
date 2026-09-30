@@ -10,6 +10,8 @@ internal sealed class DetailCycleItem
 
     public string PathDisplay => FormatCyclePath(ProjectNames);
 
+    public string HighlightCycleLabel { get; set; } = string.Empty;
+
     public static string FormatCyclePath(IReadOnlyList<string> names)
     {
         if (names.Count == 0)

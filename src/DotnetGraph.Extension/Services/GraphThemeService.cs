@@ -13,14 +13,33 @@ internal static class GraphThemeService
     public const string SidebarLinkBrushKey = "SidebarLinkBrush";
     private static bool _vsDefaultStylesMerged;
 
-    public static string ResolveWebTheme(GraphThemePreference preference) =>
-        preference switch
+    public static bool IsHighContrast()
+    {
+        if (SystemParameters.HighContrast)
+        {
+            return true;
+        }
+
+        var vsTheme = TryGetVisualStudioThemeName();
+        return !string.IsNullOrWhiteSpace(vsTheme)
+            && vsTheme.IndexOf("HighContrast", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    public static string ResolveWebTheme(GraphThemePreference preference)
+    {
+        if (preference == GraphThemePreference.System && IsHighContrast())
+        {
+            return "hc";
+        }
+
+        return preference switch
         {
             GraphThemePreference.Light => "light",
             GraphThemePreference.Dark => "dark",
             GraphThemePreference.System => IsVisualStudioDark() ? "dark" : "light",
             _ => "light"
         };
+    }
 
     public static bool IsVisualStudioDark()
     {
@@ -89,6 +108,7 @@ internal static class GraphThemeService
         ComboBox comboBox,
         TextBlock themeLabel,
         TextBlock languageLabel,
+        TextBlock scopeLabel,
         FrameworkElement brushRoot,
         bool useVisualStudioCombo)
     {
@@ -114,6 +134,7 @@ internal static class GraphThemeService
 
         ApplyVsCaptionLabel(themeLabel);
         ApplyVsCaptionLabel(languageLabel);
+        ApplyVsCaptionLabel(scopeLabel);
     }
 
     public static void ApplyFluentComboBoxColors(ComboBox comboBox, FrameworkElement resourceRoot)
@@ -176,6 +197,7 @@ internal static class GraphThemeService
         TextBlock detailMeta,
         TextBlock themeLabel,
         TextBlock languageLabel,
+        TextBlock scopeLabel,
         TextBlock detailLoadingText,
         TextBlock sectionProjectRefs,
         TextBlock sectionPackages,
@@ -202,7 +224,7 @@ internal static class GraphThemeService
         {
             ApplyVisualStudioChrome(
                 root, header, graphHost, detailPanel, detailHeader, title, subtitle, detailTitle, detailMeta,
-                themeLabel, languageLabel, detailLoadingText, sectionProjectRefs, sectionPackages, sectionTypes,
+                themeLabel, languageLabel, scopeLabel, detailLoadingText, sectionProjectRefs, sectionPackages, sectionTypes,
                 projectReferencesList, packageReferencesList, typesList, refreshButton, closeDetailButton,
                 detailSplitter, loadingOverlay, loadingText, showArchitectureButton, showCallGraphButton,
                 showNamespaceMapButton, copyProjectRefsButton, exportProjectRefsButton,
@@ -213,7 +235,7 @@ internal static class GraphThemeService
         ApplyExplicitChrome(
             preference == GraphThemePreference.Dark,
             root, header, graphHost, detailPanel, detailHeader, title, subtitle, detailTitle, detailMeta,
-            themeLabel, languageLabel, detailLoadingText, sectionProjectRefs, sectionPackages, sectionTypes,
+            themeLabel, languageLabel, scopeLabel, detailLoadingText, sectionProjectRefs, sectionPackages, sectionTypes,
             projectReferencesList, packageReferencesList, typesList, refreshButton, closeDetailButton,
             detailSplitter, loadingOverlay, loadingText, showArchitectureButton, showCallGraphButton,
             showNamespaceMapButton, copyProjectRefsButton, exportProjectRefsButton,
@@ -232,6 +254,7 @@ internal static class GraphThemeService
         TextBlock detailMeta,
         TextBlock themeLabel,
         TextBlock languageLabel,
+        TextBlock scopeLabel,
         TextBlock detailLoadingText,
         TextBlock sectionProjectRefs,
         TextBlock sectionPackages,
@@ -264,14 +287,14 @@ internal static class GraphThemeService
         detailHeader.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
         detailSplitter.SetResourceReference(Control.BackgroundProperty, EnvironmentColors.ToolWindowBorderBrushKey);
 
-        BindTextTheme(title, subtitle, detailTitle, detailMeta, themeLabel, languageLabel, detailLoadingText,
+        BindTextTheme(title, subtitle, detailTitle, detailMeta, themeLabel, languageLabel, scopeLabel, detailLoadingText,
             sectionProjectRefs, sectionPackages, sectionTypes, projectReferencesList, packageReferencesList, typesList, loadingText);
 
         loadingOverlay.SetResourceReference(Border.BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
 
         SetSidebarLinkBrush(root, EnvironmentColors.PanelHyperlinkBrushKey);
-        SetFluentResourceBrushes(root, IsVisualStudioDark());
-        ApplyVsFluentChrome(root, headerActionsPanel, themeComboBox, themeLabel, languageLabel, detailLoadingProgress, overlayProgress, useVisualStudioCombo: false);
+        SetFluentResourceBrushes(root, IsVisualStudioDark() && !IsHighContrast());
+        ApplyVsFluentChrome(root, headerActionsPanel, themeComboBox, themeLabel, languageLabel, scopeLabel, detailLoadingProgress, overlayProgress, useVisualStudioCombo: true);
     }
 
     private static void ApplyExplicitChrome(
@@ -287,6 +310,7 @@ internal static class GraphThemeService
         TextBlock detailMeta,
         TextBlock themeLabel,
         TextBlock languageLabel,
+        TextBlock scopeLabel,
         TextBlock detailLoadingText,
         TextBlock sectionProjectRefs,
         TextBlock sectionPackages,
@@ -333,6 +357,7 @@ internal static class GraphThemeService
         SetSolid(detailMeta, TextBlock.ForegroundProperty, text);
         SetSolid(themeLabel, TextBlock.ForegroundProperty, text);
         SetSolid(languageLabel, TextBlock.ForegroundProperty, text);
+        SetSolid(scopeLabel, TextBlock.ForegroundProperty, text);
         SetSolid(detailLoadingText, TextBlock.ForegroundProperty, text);
         SetSolid(sectionProjectRefs, TextBlock.ForegroundProperty, text);
         SetSolid(sectionPackages, TextBlock.ForegroundProperty, text);
@@ -346,7 +371,8 @@ internal static class GraphThemeService
         SetFluentResourceBrushes(root, dark);
         SetSolid(themeLabel, TextBlock.ForegroundProperty, text);
         SetSolid(languageLabel, TextBlock.ForegroundProperty, text);
-        ApplyVsFluentChrome(root, headerActionsPanel, themeComboBox, themeLabel, languageLabel, detailLoadingProgress, overlayProgress, useVisualStudioCombo: false);
+        SetSolid(scopeLabel, TextBlock.ForegroundProperty, text);
+        ApplyVsFluentChrome(root, headerActionsPanel, themeComboBox, themeLabel, languageLabel, scopeLabel, detailLoadingProgress, overlayProgress, useVisualStudioCombo: false);
     }
 
     private static void ApplyVsFluentChrome(
@@ -355,6 +381,7 @@ internal static class GraphThemeService
         ComboBox themeComboBox,
         TextBlock themeLabel,
         TextBlock languageLabel,
+        TextBlock scopeLabel,
         ProgressBar detailLoadingProgress,
         ProgressBar overlayProgress,
         bool useVisualStudioCombo)
@@ -364,7 +391,7 @@ internal static class GraphThemeService
             headerAsPanel.Background = Brushes.Transparent;
         }
 
-        ApplyVsFluentHeader(headerActionsPanel, themeComboBox, themeLabel, languageLabel, brushRoot, useVisualStudioCombo);
+        ApplyVsFluentHeader(headerActionsPanel, themeComboBox, themeLabel, languageLabel, scopeLabel, brushRoot, useVisualStudioCombo);
         ApplyVsProgressBarTheme(detailLoadingProgress);
         ApplyVsProgressBarTheme(overlayProgress);
     }
@@ -376,6 +403,7 @@ internal static class GraphThemeService
         TextBlock detailMeta,
         TextBlock themeLabel,
         TextBlock languageLabel,
+        TextBlock scopeLabel,
         TextBlock detailLoadingText,
         TextBlock sectionProjectRefs,
         TextBlock sectionPackages,
@@ -391,6 +419,7 @@ internal static class GraphThemeService
         detailMeta.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
         themeLabel.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
         languageLabel.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+        scopeLabel.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
         detailLoadingText.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
         sectionProjectRefs.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
         sectionPackages.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);

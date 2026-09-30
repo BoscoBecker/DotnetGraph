@@ -39,4 +39,10 @@ public static class GraphJsonSerializer
 
     public static string SerializeNamespaceMap(NamespaceMapResult graph) =>
         JsonSerializer.Serialize(graph, Options);
+
+    public static string SerializeTypeGraph(TypeGraphResult graph) =>
+        JsonSerializer.Serialize(graph, Options);
+
+    public static string SerializeImpactAnalysis(ImpactAnalysisResult graph) =>
+        JsonSerializer.Serialize(graph, Options);
 }

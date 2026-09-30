@@ -25,7 +25,7 @@
             <Setter Property="Padding" Value="12,6"/>
             <Setter Property="Margin" Value="2,0"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, sans-serif"/>
+            <Setter Property="FontFamily" Value="Cascadia UI Variable, Cascadia UI, Segoe UI Variable, Segoe UI, sans-serif"/>
             <Setter Property="Background" Value="{DynamicResource GraphFluentSurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource GraphFluentBorderBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource GraphFluentTextBrush}"/>
@@ -39,7 +39,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
+                                CornerRadius="6"
                                 Padding="{TemplateBinding Padding}"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center"
@@ -73,7 +73,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
+                                CornerRadius="6"
                                 Padding="{TemplateBinding Padding}"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center"
@@ -118,7 +118,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
+                                CornerRadius="6"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -188,7 +188,7 @@
                                                 Background="{Binding Background, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                 BorderBrush="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                 BorderThickness="{Binding BorderThickness, RelativeSource={RelativeSource AncestorType=ComboBox}}"
-                                                CornerRadius="4"
+                                                CornerRadius="6"
                                                 SnapsToDevicePixels="True">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -199,6 +199,7 @@
                                                                   Margin="{Binding Padding, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   HorizontalAlignment="Left"
                                                                   VerticalAlignment="Center"
+                                                                  TextElement.Foreground="{DynamicResource GraphFluentTextBrush}"
                                                                   Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   ContentTemplateSelector="{Binding ItemTemplateSelector, RelativeSource={RelativeSource AncestorType=ComboBox}}"/>
@@ -224,7 +225,7 @@
                                         Background="{DynamicResource GraphFluentSurfaceBrush}"
                                         BorderBrush="{DynamicResource GraphFluentBorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="4">
+                                        CornerRadius="6">
                                     <ScrollViewer SnapsToDevicePixels="True">
                                         <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
@@ -248,6 +249,14 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
+        <Style x:Key="GraphViewToggleButton" TargetType="Button" BasedOn="{StaticResource GraphFluentButton}">
+            <Setter Property="MinWidth" Value="72"/>
+        </Style>
+
+        <Style x:Key="GraphViewToggleButtonActive" TargetType="Button" BasedOn="{StaticResource GraphFluentAccentButton}">
+            <Setter Property="MinWidth" Value="72"/>
+        </Style>
+
         <Style x:Key="GraphListItem" TargetType="TextBlock">
 
             <Setter Property="FontSize" Value="12"/>
@@ -269,6 +278,8 @@
             <Setter Property="Margin" Value="0,14,0,6"/>
 
             <Setter Property="Opacity" Value="0.85"/>
+
+            <Setter Property="Foreground" Value="{DynamicResource GraphFluentTextBrush}"/>
 
         </Style>
 
@@ -370,7 +381,7 @@
 
                     <TextBlock x:Name="TitleText" Text="Dotnet Graph" FontSize="13" FontWeight="SemiBold"
 
-                               FontFamily="Segoe UI Variable, Segoe UI, sans-serif"/>
+                               FontFamily="Cascadia UI Variable, Cascadia UI, Segoe UI Variable, Segoe UI, sans-serif"/>
 
                     <TextBlock x:Name="SolutionLabel" Margin="0,2,0,0" FontSize="11" TextWrapping="Wrap"/>
 
@@ -400,17 +411,31 @@
 
                             VerticalAlignment="Center" HorizontalAlignment="Right">
 
-                    <Button x:Name="ShowArchitectureButton" Style="{StaticResource GraphFluentButton}" Content="Arquitetura"
+                    <Button x:Name="ShowArchitectureButton" Style="{StaticResource GraphViewToggleButtonActive}" Content="Arquitetura"
 
                             Click="ShowArchitectureButton_OnClick"/>
 
-                    <Button x:Name="ShowCallGraphButton" Style="{StaticResource GraphFluentButton}" Content="Call Graph" IsEnabled="False"
+                    <Button x:Name="ShowCallGraphButton" Style="{StaticResource GraphViewToggleButton}" Content="Call Graph" IsEnabled="False"
 
                             Click="ShowCallGraphButton_OnClick"/>
 
-                    <Button x:Name="ShowNamespaceMapButton" Style="{StaticResource GraphFluentButton}" Content="Namespaces" IsEnabled="False"
+                    <Button x:Name="ShowNamespaceMapButton" Style="{StaticResource GraphViewToggleButton}" Content="Namespaces" IsEnabled="False"
 
                             Click="ShowNamespaceMapButton_OnClick"/>
+
+                    <Button x:Name="ShowTypeGraphButton" Style="{StaticResource GraphViewToggleButton}" Content="Types" IsEnabled="False"
+
+                            Click="ShowTypeGraphButton_OnClick"/>
+
+                    <Border Width="1" Height="24" Margin="10,0" VerticalAlignment="Center"
+
+                            Background="{DynamicResource GraphFluentBorderBrush}"/>
+
+                    <TextBlock x:Name="ScopeLabel" Text="Camada" VerticalAlignment="Center" Margin="8,0,8,0"/>
+
+                    <ComboBox x:Name="SolutionScopeComboBox" MinWidth="140" MaxWidth="220" Style="{StaticResource GraphFluentComboBox}"
+
+                              SelectionChanged="SolutionScopeComboBox_OnSelectionChanged"/>
 
                     <Border Width="1" Height="24" Margin="10,0" VerticalAlignment="Center"
 
@@ -429,6 +454,14 @@
                         <ComboBoxItem Content="Escuro" Tag="Dark"/>
 
                     </ComboBox>
+
+                    <Button x:Name="ExportPngButton" Style="{StaticResource GraphFluentButton}" Margin="8,0,0,0"
+
+                            Content="PNG" IsEnabled="False" Click="ExportPngButton_OnClick"/>
+
+                    <Button x:Name="ExportMermaidButton" Style="{StaticResource GraphFluentButton}" Margin="4,0,0,0"
+
+                            Content="Mermaid" IsEnabled="False" Click="ExportMermaidButton_OnClick"/>
 
                     <Button x:Name="RefreshButton" Style="{StaticResource GraphFluentAccentButton}" Margin="8,0,0,0"
 
@@ -556,7 +589,7 @@
 
                                                FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
 
-                                    <TextBlock Text="Path:" Style="{StaticResource GraphSectionTitle}" Margin="0,0,0,4"/>
+                                    <TextBlock x:Name="CircularPathLabel" Text="Path:" Style="{StaticResource GraphSectionTitle}" Margin="0,0,0,4"/>
 
                                     <ItemsControl x:Name="CircularDependencyCyclesList">
 
@@ -574,7 +607,7 @@
 
                                                                    FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
 
-                                                        <Button Content="Destacar no grafo" Tag="{Binding Index}"
+                                                        <Button Content="{Binding HighlightCycleLabel}" Tag="{Binding Index}"
 
                                                                 Style="{StaticResource GraphFluentButton}"
 
@@ -616,6 +649,12 @@
 
                                     </StackPanel>
 
+                                    <TextBlock x:Name="ProjectRefsActionStatus" FontSize="11" Margin="0,6,0,0"
+
+                                               TextWrapping="Wrap" Visibility="Collapsed"
+
+                                               Foreground="{DynamicResource GraphFluentAccentBrush}"/>
+
                                 </StackPanel>
 
                                 <ItemsControl x:Name="ProjectReferencesList">
@@ -650,9 +689,23 @@
 
                                 </ItemsControl>
 
-                                <TextBlock x:Name="SectionTypes" Text="TIPOS / MÓDULOS"
+                                <StackPanel x:Name="TypesSectionPanel" Margin="0,14,0,6">
 
-                                           Style="{StaticResource GraphSectionTitle}"/>
+                                    <TextBlock x:Name="SectionTypes" Text="TIPOS / MÓDULOS"
+
+                                               Style="{StaticResource GraphSectionTitle}" Margin="0,0,0,4"/>
+
+                                    <Button x:Name="WhoUsesButton" Style="{StaticResource GraphFluentButton}"
+
+                                            Content="Quem usa isto?" IsEnabled="False"
+
+                                            HorizontalAlignment="Left" Click="WhoUsesButton_OnClick"/>
+
+                                </StackPanel>
+
+                                <TextBlock x:Name="SectionImpactUsages" Text="USOS NA SOLUÇÃO"
+
+                                           Style="{StaticResource GraphSectionTitle}" Visibility="Collapsed"/>
 
                                 <TextBlock x:Name="SectionCallMethods" Text="MÉTODOS (CALL GRAPH)"
 
@@ -666,9 +719,11 @@
 
                                     <ItemsControl.ItemTemplate>
 
-                                        <DataTemplate>
+                                        <DataTemplate DataType="{x:Type local:DetailLinkItem}">
 
-                                            <TextBlock Text="{Binding}" Style="{StaticResource GraphListItem}"/>
+                                            <Button Content="{Binding DisplayText}" Tag="{Binding}"
+
+                                                    Click="TypeLink_OnClick" Style="{StaticResource GraphNavLink}"/>
 
                                         </DataTemplate>
 

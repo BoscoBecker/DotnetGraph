@@ -3,7 +3,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Authors>DotnetGraph</Authors>
+    <Authors>João Bosco</Authors>
     <Company>DotnetGraph</Company>
     <Copyright>Copyright © DotnetGraph</Copyright>
   </PropertyGroup>

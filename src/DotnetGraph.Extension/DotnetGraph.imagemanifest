@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.microsoft.com/VisualStudio/ImageManifestSchema/2014">
+  <Symbols>
+    <String Name="Resources" Value="/DotnetGraph.Extension;Component/Resources/Icons" />
+    <Guid Name="ImageGuid" Value="{f2c8a1b3-6d4e-4f90-9a2b-1c3d4e5f6071}" />
+    <ID Name="Graph16" Value="1" />
+    <ID Name="Graph32" Value="2" />
+  </Symbols>
+  <Images>
+    <Image Guid="$(ImageGuid)" ID="$(Graph16)" AllowColorInversion="false">
+      <Source Uri="$(Resources)/CommandGraph16.png">
+        <Size Value="16" />
+      </Source>
+    </Image>
+    <Image Guid="$(ImageGuid)" ID="$(Graph32)" AllowColorInversion="false">
+      <Source Uri="$(Resources)/CommandGraph32.png">
+        <Size Value="32" />
+      </Source>
+    </Image>
+  </Images>
+</ImageManifest>

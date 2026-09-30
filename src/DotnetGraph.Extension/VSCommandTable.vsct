@@ -38,6 +38,14 @@
 
         <Icon guid="guidDotnetGraphImages" id="bmpGraph16"/>
 
+        <CommandFlag>IconIsMoniker</CommandFlag>
+
+        <CommandFlag>IconAndText</CommandFlag>
+
+        <CommandFlag>DefaultInvisible</CommandFlag>
+
+        <CommandFlag>DynamicVisibility</CommandFlag>
+
         <Strings>
 
           <ButtonText>Dotnet Graph</ButtonText>
@@ -49,14 +57,6 @@
       </Button>
 
     </Buttons>
-
-
-
-    <Bitmaps>
-
-      <Bitmap guid="guidDotnetGraphImages" href="Resources\Icons\CommandGraphIcons.png" UsedList="1;2"/>
-
-    </Bitmaps>
 
 
 
@@ -73,6 +73,16 @@
     </CommandPlacement>
 
   </CommandPlacements>
+
+
+
+  <VisibilityConstraints>
+
+    <VisibilityItem guid="guidDotnetGraphCommandSet" id="cmdidShowDependencyGraph" context="UICONTEXT_SolutionHasSingleProject"/>
+
+    <VisibilityItem guid="guidDotnetGraphCommandSet" id="cmdidShowDependencyGraph" context="UICONTEXT_SolutionHasMultipleProjects"/>
+
+  </VisibilityConstraints>
 
 
 

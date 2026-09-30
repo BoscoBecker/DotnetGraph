@@ -9,11 +9,24 @@ var outputDir = args.Length > 0
 
 Directory.CreateDirectory(outputDir);
 
-SaveGraphIconPng(128, Path.Combine(outputDir, "PackageIcon.png"), detailed: true);
-WriteCommandIconStrip(Path.Combine(outputDir, "CommandGraphIcons.png"));
-SaveGraphIconPng(16, Path.Combine(outputDir, "CommandGraph16.png"), detailed: false);
+var commandGraph16Path = Path.Combine(outputDir, "CommandGraph16.png");
+var menuIconSourcePath = Path.Combine(outputDir, "MenuIconSource.png");
 
-static void WriteCommandIconStrip(string path)
+if (File.Exists(menuIconSourcePath))
+{
+    File.Copy(menuIconSourcePath, commandGraph16Path, overwrite: true);
+}
+
+if (!File.Exists(commandGraph16Path))
+{
+    SaveGraphIconPng(16, commandGraph16Path, detailed: false);
+}
+
+SaveGraphIconPng(128, Path.Combine(outputDir, "PackageIcon.png"), detailed: true);
+WriteCommandIconStrip(Path.Combine(outputDir, "CommandGraphIcons.png"), commandGraph16Path);
+SaveGraphIconPng(32, Path.Combine(outputDir, "CommandGraph32.png"), detailed: false, source16Path: commandGraph16Path);
+
+static void WriteCommandIconStrip(string path, string commandGraph16Path)
 {
     const int stripWidth = 32;
     const int frameHeight = 32;
@@ -26,11 +39,7 @@ static void WriteCommandIconStrip(string path)
     for (var index = 0; index < frameCount; index++)
     {
         var size = index == 0 ? 16 : 32;
-        using var frame = new Bitmap(size, size, PixelFormat.Format32bppArgb);
-        using (var frameGraphics = Graphics.FromImage(frame))
-        {
-            RenderGraphIcon(frameGraphics, size, detailed: false);
-        }
+        using var frame = CreateCommandFrame(size, commandGraph16Path);
 
         var offsetX = (stripWidth - size) / 2;
         var offsetY = index * frameHeight + (frameHeight - size) / 2;
@@ -40,12 +49,52 @@ static void WriteCommandIconStrip(string path)
     bitmap.Save(path, ImageFormat.Png);
 }
 
-static void SaveGraphIconPng(int size, string path, bool detailed)
+static Bitmap CreateCommandFrame(int size, string commandGraph16Path)
 {
+    if (size == 16 && File.Exists(commandGraph16Path))
+    {
+        using var source = new Bitmap(commandGraph16Path);
+        return new Bitmap(source);
+    }
+
     using var bitmap = new Bitmap(size, size, PixelFormat.Format32bppArgb);
-    using var graphics = Graphics.FromImage(bitmap);
-    RenderGraphIcon(graphics, size, detailed);
-    bitmap.Save(path, ImageFormat.Png);
+    using (var graphics = Graphics.FromImage(bitmap))
+    {
+        if (size == 32 && File.Exists(commandGraph16Path))
+        {
+            using var source = new Bitmap(commandGraph16Path);
+            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            graphics.DrawImage(source, 0, 0, size, size);
+        }
+        else
+        {
+            RenderGraphIcon(graphics, size, detailed: false);
+        }
+    }
+
+    return new Bitmap(bitmap);
+}
+
+static void SaveGraphIconPng(int size, string path, bool detailed, string? source16Path = null)
+{
+    if (size == 32 && !string.IsNullOrEmpty(source16Path) && File.Exists(source16Path))
+    {
+        using var source = new Bitmap(source16Path);
+        using var bitmap = new Bitmap(size, size, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        graphics.DrawImage(source, 0, 0, size, size);
+        bitmap.Save(path, ImageFormat.Png);
+        return;
+    }
+
+    using var generated = new Bitmap(size, size, PixelFormat.Format32bppArgb);
+    using (var graphics = Graphics.FromImage(generated))
+    {
+        RenderGraphIcon(graphics, size, detailed);
+    }
+
+    generated.Save(path, ImageFormat.Png);
 }
 
 static void RenderGraphIcon(Graphics graphics, int size, bool detailed)
