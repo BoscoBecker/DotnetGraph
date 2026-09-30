@@ -11,7 +11,15 @@
   let focusPhase = 0;
   let currentView = "architecture";
   let callGraphTitle = "";
+  let impactGraphTitle = "";
   let callGraphAnchor = null;
+  let namespaceProjectAnchor = null;
+  let namespaceAnchorPinned = false;
+  let callGraphContentWidth = 0;
+  let callGraphContentHeight = 0;
+  const accessibilityFilterKeys = ["public", "internal", "private", "protected"];
+  const namespaceAccessFilters = new Set();
+  const callGraphAccessFilters = new Set();
   let namespaceClusters = [];
   let namespaceEdges = [];
   let namespaceRoot = "";
@@ -29,7 +37,10 @@
     focus: "Foco",
     callGraph: "Call Graph",
     namespaceMap: "Namespace map",
-    typesCount: "tipos"
+    typesCount: "tipos",
+    typeGraph: "Type graph",
+    impactGraph: "Impact analysis",
+    usages: "uso(s)"
   };
   let selectedNamespaceClusterId = null;
   let circularDependencies = [];
@@ -74,7 +85,7 @@
       return;
     }
 
-    if (currentView === "architecture") {
+    if (currentView === "architecture" || currentView === "impactGraph") {
       for (const node of nodes) {
         const saved = positions[node.id];
         if (saved) {
@@ -88,7 +99,7 @@
       return;
     }
 
-    if (currentView === "callGraph") {
+    if (currentView === "callGraph" || currentView === "typeGraph") {
       const anchor = positions.__anchor__;
       if (anchor && callGraphAnchor) {
         callGraphAnchor.x = anchor.x;
@@ -108,6 +119,13 @@
     }
 
     if (currentView === "namespaceMap") {
+      const anchor = positions.__anchor__;
+      if (anchor && namespaceProjectAnchor) {
+        namespaceProjectAnchor.x = anchor.x;
+        namespaceProjectAnchor.y = anchor.y;
+        namespaceAnchorPinned = true;
+      }
+
       for (const cluster of namespaceClusters) {
         const saved = positions[cluster.id];
         if (saved) {
@@ -133,6 +151,9 @@
         positions[node.id] = { x: node.x, y: node.y };
       }
     } else if (currentView === "namespaceMap") {
+      if (namespaceProjectAnchor) {
+        positions.__anchor__ = { x: namespaceProjectAnchor.x, y: namespaceProjectAnchor.y };
+      }
       for (const cluster of namespaceClusters) {
         positions[cluster.id] = { x: cluster.x, y: cluster.y };
       }
@@ -156,24 +177,124 @@
   }
 
   function applyTheme(nextTheme) {
-    theme = nextTheme === "dark" ? "dark" : "light";
+    theme = nextTheme === "dark" ? "dark" : nextTheme === "hc" ? "hc" : "light";
     document.documentElement.classList.toggle("theme-dark", theme === "dark");
+    document.documentElement.classList.toggle("theme-hc", theme === "hc");
     draw();
   }
 
-  function setCallGraphLegend() {
+  function normalizeAccessibilityKey(accessibility) {
+    if (!accessibility || accessibility === "unknown") {
+      return "unknown";
+    }
+    if (accessibility === "protectedInternal") {
+      return "protected";
+    }
+    return accessibility;
+  }
+
+  function accessibilityAccentColor(accessibility) {
+    const key = normalizeAccessibilityKey(accessibility);
+    return (accessibilityStyle[key] || accessibilityStyle.unknown).color;
+  }
+
+  function renderAccessibilityLegend(activeFilters, onToggle) {
     if (!legendEl) return;
-    legendEl.innerHTML = Object.entries(accessibilityStyle)
-      .filter(([key]) => key !== "unknown")
-      .map(
-        ([key, style]) =>
-          `<span class="badge access-${key}" style="border-color:${style.color};color:${style.color}">${style.label}</span>`
-      )
+    legendEl.style.pointerEvents = "auto";
+    legendEl.innerHTML = accessibilityFilterKeys
+      .map((key) => {
+        const style = accessibilityStyle[key];
+        const selected = activeFilters.has(key);
+        const dimmed = activeFilters.size > 0 && !selected;
+        const activeStyle = selected
+          ? `background:${style.color};color:#ffffff;border-color:${style.color};`
+          : `border-color:${style.color};color:${style.color};`;
+        const dimClass = dimmed ? " dimmed" : "";
+        return `<span class="badge access-${key}${selected ? " active" : ""}${dimClass}" data-access="${key}" style="${activeStyle}cursor:pointer;">${style.label}</span>`;
+      })
       .join("");
+
+    legendEl.querySelectorAll(".badge[data-access]").forEach((badge) => {
+      badge.addEventListener("click", () => {
+        onToggle(badge.getAttribute("data-access"));
+      });
+    });
+  }
+
+  function setCallGraphLegend() {
+    renderAccessibilityLegend(callGraphAccessFilters, toggleCallGraphAccessFilter);
+  }
+
+  function clusterAccessibilityKeys(cluster) {
+    const types = cluster.types || [];
+    if (types.length === 0) {
+      return new Set(["unknown"]);
+    }
+    const keys = new Set();
+    for (const typeEntry of types) {
+      keys.add(normalizeAccessibilityKey(typeEntry.accessibility || "unknown"));
+    }
+    return keys;
+  }
+
+  function clusterMatchesAccessFilter(cluster) {
+    if (namespaceAccessFilters.size === 0) {
+      return true;
+    }
+    const keys = clusterAccessibilityKeys(cluster);
+    for (const filterKey of namespaceAccessFilters) {
+      if (keys.has(filterKey) || keys.has(normalizeAccessibilityKey(filterKey))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function callGraphNodeMatchesAccessFilter(node) {
+    if (callGraphAccessFilters.size === 0) {
+      return true;
+    }
+    const key = normalizeAccessibilityKey(node.accessibility);
+    return callGraphAccessFilters.has(key);
+  }
+
+  function visibleCallGraphNodes() {
+    return nodes.filter(callGraphNodeMatchesAccessFilter);
+  }
+
+  function toggleCallGraphAccessFilter(key) {
+    if (callGraphAccessFilters.has(key)) {
+      callGraphAccessFilters.delete(key);
+    } else {
+      callGraphAccessFilters.add(key);
+    }
+    setCallGraphLegend();
+    updateStatusBar();
+    draw();
+  }
+
+  function visibleNamespaceClusters() {
+    return namespaceClusters.filter(clusterMatchesAccessFilter);
+  }
+
+  function toggleNamespaceAccessFilter(key) {
+    if (namespaceAccessFilters.has(key)) {
+      namespaceAccessFilters.delete(key);
+    } else {
+      namespaceAccessFilters.add(key);
+    }
+    setNamespaceLegend();
+    updateStatusBar();
+    draw();
+  }
+
+  function setNamespaceLegend() {
+    renderAccessibilityLegend(namespaceAccessFilters, toggleNamespaceAccessFilter);
   }
 
   function restoreArchitectureLegend() {
     if (legendEl) {
+      legendEl.style.pointerEvents = "none";
       legendEl.innerHTML = defaultLegendHtml;
     }
   }
@@ -189,13 +310,30 @@
   function updateStatusBar() {
     if (!statusSummary || !statusSelection) return;
     if (currentView === "callGraph") {
-      statusSummary.textContent = `${nodes.length} ${t("methods", "método(s)")} · ${edges.length} ${t("calls", "chamada(s)")}`;
+      const visibleMethods = visibleCallGraphNodes();
+      const filterHint =
+        callGraphAccessFilters.size > 0 ? ` · ${visibleMethods.length}/${nodes.length}` : "";
+      statusSummary.textContent = `${nodes.length} ${t("methods", "método(s)")}${filterHint} · ${edges.length} ${t("calls", "chamada(s)")}`;
       statusSelection.textContent = callGraphTitle ? `${t("callGraph", "Call graph")}: ${callGraphTitle}` : t("callGraph", "Call graph");
       return;
     }
     if (currentView === "namespaceMap") {
-      statusSummary.textContent = `${namespaceClusters.length} ${t("clusters", "cluster(s)")} · ${namespaceEdges.length} ${t("links", "ligação(ões)")}`;
+      const visible = visibleNamespaceClusters();
+      const filterHint =
+        namespaceAccessFilters.size > 0 ? ` · ${visible.length}/${namespaceClusters.length}` : "";
+      statusSummary.textContent = `${namespaceClusters.length} ${t("clusters", "cluster(s)")}${filterHint} · ${namespaceEdges.length} ${t("links", "ligação(ões)")}`;
       statusSelection.textContent = namespaceRoot ? `Namespace: ${namespaceRoot}` : t("namespaceMap", "Namespace map");
+      return;
+    }
+    if (currentView === "typeGraph") {
+      statusSummary.textContent = `${nodes.length} ${t("typesCount", "tipos")} · ${edges.length} ${t("links", "ligação(ões)")}`;
+      statusSelection.textContent = callGraphTitle ? `${t("typeGraph", "Type graph")}: ${callGraphTitle}` : t("typeGraph", "Type graph");
+      return;
+    }
+    if (currentView === "impactGraph") {
+      const usageTotal = nodes.reduce((sum, n) => sum + (n.usageCount || 0), 0);
+      statusSummary.textContent = `${nodes.length} ${t("projects", "projeto(s)")} · ${usageTotal} ${t("usages", "uso(s)")}`;
+      statusSelection.textContent = impactGraphTitle ? `${t("impactGraph", "Impact analysis")}: ${impactGraphTitle}` : t("impactGraph", "Impact analysis");
       return;
     }
     const count = nodes.length;
@@ -215,16 +353,169 @@
     statusSelection.textContent = node ? `${t("focus", "Foco")}: ${node.name}` : "";
   }
 
-  function computeNamespaceFrameBounds() {
-    if (namespaceClusters.length === 0) {
+  function computeNamespaceFrameBounds(clusters) {
+    const list = clusters && clusters.length ? clusters : namespaceClusters;
+    if (list.length === 0) {
       return null;
     }
 
-    const minX = Math.min(...namespaceClusters.map((c) => c.x)) - 24;
-    const minY = Math.min(...namespaceClusters.map((c) => c.y)) - 36;
-    const maxX = Math.max(...namespaceClusters.map((c) => c.x + c.w)) + 24;
-    const maxY = Math.max(...namespaceClusters.map((c) => c.y + c.h)) + 24;
+    const minX = Math.min(...list.map((c) => c.x)) - 24;
+    const minY = Math.min(...list.map((c) => c.y)) - 36;
+    const maxX = Math.max(...list.map((c) => c.x + c.w)) + 24;
+    const maxY = Math.max(...list.map((c) => c.y + c.h)) + 24;
     return { minX, minY, maxX, maxY };
+  }
+
+  function getGraphViewport() {
+    return document.getElementById("graphViewport");
+  }
+
+  function getLayoutViewportWidth() {
+    const viewport = getGraphViewport();
+    return viewport ? viewport.clientWidth : canvas.clientWidth || window.innerWidth;
+  }
+
+  function getLayoutViewportHeight() {
+    const viewport = getGraphViewport();
+    return viewport ? viewport.clientHeight : canvas.clientHeight || window.innerHeight;
+  }
+
+  function isCallGraphLikeView() {
+    return currentView === "callGraph" || currentView === "typeGraph";
+  }
+
+  function computeCallGraphBounds() {
+    const halfW = 66;
+    const halfH = 28;
+    const anchorRadius = 52;
+    const anchorLabel = 28;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    if (callGraphAnchor) {
+      minX = Math.min(minX, callGraphAnchor.x - anchorRadius);
+      maxX = Math.max(maxX, callGraphAnchor.x + anchorRadius);
+      minY = Math.min(minY, callGraphAnchor.y - anchorRadius);
+      maxY = Math.max(maxY, callGraphAnchor.y + anchorRadius + anchorLabel);
+    }
+
+    for (const node of nodes) {
+      minX = Math.min(minX, node.x - halfW);
+      maxX = Math.max(maxX, node.x + halfW);
+      minY = Math.min(minY, node.y - halfH);
+      maxY = Math.max(maxY, node.y + halfH);
+    }
+
+    if (!Number.isFinite(minX)) {
+      return null;
+    }
+
+    return { minX, minY, maxX, maxY };
+  }
+
+  function shiftCallGraphLayout(deltaX, deltaY) {
+    if (deltaX === 0 && deltaY === 0) {
+      return;
+    }
+
+    if (callGraphAnchor) {
+      callGraphAnchor.x += deltaX;
+      callGraphAnchor.y += deltaY;
+    }
+
+    for (const node of nodes) {
+      node.x += deltaX;
+      node.y += deltaY;
+    }
+  }
+
+  function normalizeCallGraphLayout() {
+    const bounds = computeCallGraphBounds();
+    if (!bounds) {
+      return;
+    }
+
+    const pad = 48;
+    const deltaX = bounds.minX < pad ? pad - bounds.minX : 0;
+    const deltaY = bounds.minY < pad ? pad - bounds.minY : 0;
+    shiftCallGraphLayout(deltaX, deltaY);
+  }
+
+  function recomputeCallGraphContentBounds() {
+    const rowPadding = 96;
+    const vpW = getLayoutViewportWidth();
+    const vpH = getLayoutViewportHeight();
+    const bounds = computeCallGraphBounds();
+    if (!bounds) {
+      callGraphContentWidth = vpW;
+      callGraphContentHeight = vpH;
+      return;
+    }
+
+    callGraphContentWidth = Math.max(vpW, bounds.maxX + rowPadding);
+    callGraphContentHeight = Math.max(vpH, bounds.maxY + 64);
+  }
+
+  function scrollCallGraphToVisibleCenter() {
+    const viewport = getGraphViewport();
+    if (!viewport || !isCallGraphLikeView()) {
+      return;
+    }
+
+    const bounds = computeCallGraphBounds();
+    if (!bounds) {
+      return;
+    }
+
+    const pad = 32;
+    const maxScrollLeft = Math.max(0, canvas.clientWidth - viewport.clientWidth);
+    const maxScrollTop = Math.max(0, canvas.clientHeight - viewport.clientHeight);
+    const contentW = bounds.maxX - bounds.minX;
+    const contentH = bounds.maxY - bounds.minY;
+
+    if (contentW + pad * 2 <= viewport.clientWidth) {
+      viewport.scrollLeft = Math.min(
+        maxScrollLeft,
+        Math.max(0, bounds.minX - (viewport.clientWidth - contentW) / 2)
+      );
+    } else {
+      viewport.scrollLeft = Math.min(maxScrollLeft, Math.max(0, bounds.minX - pad));
+    }
+
+    if (contentH + pad * 2 <= viewport.clientHeight) {
+      viewport.scrollTop = Math.min(
+        maxScrollTop,
+        Math.max(0, bounds.minY - (viewport.clientHeight - contentH) / 2)
+      );
+    } else {
+      viewport.scrollTop = Math.min(maxScrollTop, Math.max(0, bounds.minY - pad));
+    }
+  }
+
+  function finalizeCallGraphLayout() {
+    normalizeCallGraphLayout();
+    recomputeCallGraphContentBounds();
+    updateCanvasDimensions();
+    scrollCallGraphToVisibleCenter();
+  }
+
+  function updateCanvasDimensions() {
+    const vpW = getLayoutViewportWidth();
+    const vpH = getLayoutViewportHeight();
+    const drawW = isCallGraphLikeView()
+      ? Math.max(vpW, callGraphContentWidth || vpW)
+      : vpW;
+    const drawH = isCallGraphLikeView()
+      ? Math.max(vpH, callGraphContentHeight || vpH)
+      : vpH;
+    canvas.style.width = `${drawW}px`;
+    canvas.style.height = `${drawH}px`;
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = drawW * ratio;
+    canvas.height = drawH * ratio;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   }
 
   function hitNamespaceFrame(x, y) {
@@ -245,7 +536,8 @@
   }
 
   function drawFocusDots(node, color) {
-    const radius = nodeRadius(node) + 20;
+    const baseRadius = node.isCallNode ? 34 : nodeRadius(node);
+    const radius = baseRadius + 20;
     const dots = 10;
     for (let i = 0; i < dots; i++) {
       const angle = (Math.PI * 2 * i) / dots + focusPhase;
@@ -263,23 +555,17 @@
     ctx.globalAlpha = 1;
   }
 
-  function resize() {
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width = canvas.clientWidth * ratio;
-    canvas.height = canvas.clientHeight * ratio;
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  }
-
   window.addEventListener("resize", () => {
-    resize();
-    if (currentView === "callGraph") {
+    updateCanvasDimensions();
+    if (currentView === "callGraph" || currentView === "typeGraph") {
       layoutCallGraph();
+      finalizeCallGraphLayout();
     } else if (currentView === "namespaceMap") {
       layoutNamespaceMap();
     }
     draw();
   });
-  resize();
+  updateCanvasDimensions();
 
   function nodeRadius(node) {
     return selectedId === node.id ? 58 : 52;
@@ -288,6 +574,9 @@
   function hitNamespaceCluster(x, y) {
     for (let i = namespaceClusters.length - 1; i >= 0; i--) {
       const c = namespaceClusters[i];
+      if (!clusterMatchesAccessFilter(c)) {
+        continue;
+      }
       if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) {
         return c;
       }
@@ -303,6 +592,9 @@
       }
     }
     for (const node of nodes) {
+      if (!callGraphNodeMatchesAccessFilter(node)) {
+        continue;
+      }
       const w = 132;
       const h = 48;
       if (x >= node.x - w / 2 && x <= node.x + w / 2 && y >= node.y - h / 2 && y <= node.y + h / 2) {
@@ -336,8 +628,18 @@
 
   function hitTestPointer(x, y) {
     if (currentView === "namespaceMap") {
+      if (namespaceProjectAnchor) {
+        const r = 58;
+        if (
+          Math.hypot(namespaceProjectAnchor.x - x, namespaceProjectAnchor.y - y) <=
+          r + 8
+        ) {
+          return { kind: "nsAnchor", ref: namespaceProjectAnchor };
+        }
+      }
+
       const cluster = hitNamespaceCluster(x, y);
-      if (cluster) {
+      if (cluster && clusterMatchesAccessFilter(cluster)) {
         return { kind: "nsCluster", ref: cluster };
       }
 
@@ -347,11 +649,14 @@
 
       return null;
     }
-    if (currentView === "callGraph") {
+    if (currentView === "callGraph" || currentView === "typeGraph") {
       return hitCallGraph(x, y);
     }
-    const arch = hitTestArchitecture(x, y);
-    return arch;
+    if (currentView === "architecture" || currentView === "impactGraph") {
+      const arch = hitTestArchitecture(x, y);
+      return arch;
+    }
+    return null;
   }
 
   function rebuildCycleHighlightSets() {
@@ -388,6 +693,10 @@
     rebuildCycleHighlightSets();
     callGraphTitle = "";
     callGraphAnchor = null;
+    namespaceProjectAnchor = null;
+    namespaceAnchorPinned = false;
+    namespaceAccessFilters.clear();
+    callGraphAccessFilters.clear();
     restoreArchitectureLegend();
     pinned.clear();
     selectedId = null;
@@ -398,6 +707,7 @@
       name: p.name,
       language: p.language,
       targetFramework: p.targetFramework || "",
+      solutionFolder: p.solutionFolderPath || "",
       x: 140 + (index % 5) * 180,
       y: 140 + Math.floor(index / 5) * 160,
       vx: 0,
@@ -410,6 +720,8 @@
     }));
 
     layoutKey = data.layoutKey || "";
+    callGraphContentWidth = 0;
+    updateCanvasDimensions();
     applyLayoutPositions(data.layoutPositions);
     const hasSavedLayout = data.layoutPositions && Object.keys(data.layoutPositions).length > 0;
     if (!hasSavedLayout) {
@@ -429,12 +741,15 @@
     pinned.clear();
     pinnedCallNodes.clear();
     callAnchorPinned = false;
+    callGraphAccessFilters.clear();
     selectedId = null;
     setCallGraphLegend();
 
     const lang = data.projectLanguage || 1;
+    callGraphContentWidth = 0;
+    callGraphContentHeight = 0;
     callGraphAnchor = {
-      x: canvas.clientWidth / 2,
+      x: getLayoutViewportWidth() / 2,
       y: 118,
       name: data.projectName || "Project",
       language: lang,
@@ -463,8 +778,102 @@
 
     layoutCallGraph();
     applyLayoutPositions(data.layoutPositions);
+    finalizeCallGraphLayout();
     updateStatusBar();
     animate();
+  }
+
+  function buildTypeGraph(data) {
+    currentView = "typeGraph";
+    callGraphTitle = data.projectName || "Type graph";
+    cancelAnimationFrame(animationFrame);
+    pinned.clear();
+    pinnedCallNodes.clear();
+    callAnchorPinned = false;
+    callGraphAccessFilters.clear();
+    selectedId = null;
+    restoreArchitectureLegend();
+
+    const lang = data.projectLanguage || 1;
+    callGraphContentWidth = 0;
+    callGraphContentHeight = 0;
+    callGraphAnchor = {
+      x: getLayoutViewportWidth() / 2,
+      y: 118,
+      name: data.projectName || "Project",
+      language: lang,
+      targetFramework: data.targetFramework || ""
+    };
+
+    layoutKey = data.layoutKey || "";
+    nodes = (data.nodes || []).map((n) => ({
+      id: n.id,
+      name: n.label,
+      subtitle: n.subtitle || "",
+      depth: 0,
+      accessibility: n.accessibility || "unknown",
+      sourceFilePath: n.sourceFilePath || "",
+      sourceLine: n.sourceLine || 0,
+      x: 0,
+      y: 0,
+      language: lang,
+      isCallNode: true
+    }));
+
+    edges = (data.edges || []).map((e) => ({
+      source: e.sourceId,
+      target: e.targetId
+    }));
+
+    layoutCallGraph();
+    applyLayoutPositions(data.layoutPositions);
+    finalizeCallGraphLayout();
+    updateStatusBar();
+    animate();
+  }
+
+  function buildImpactGraph(data) {
+    currentView = "impactGraph";
+    impactGraphTitle = data.symbolLabel || "";
+    circularDependencies = [];
+    activeCycleIndex = -1;
+    rebuildCycleHighlightSets();
+    callGraphTitle = "";
+    callGraphAnchor = null;
+    restoreArchitectureLegend();
+    pinned.clear();
+    selectedId = null;
+
+    nodes = (data.projects || []).map((p, index) => ({
+      id: p.id,
+      name: p.name,
+      language: p.language,
+      targetFramework: p.targetFramework || "",
+      usageCount: p.usageCount || 0,
+      isDefinition: !!p.isDefinition,
+      x: 140 + (index % 5) * 180,
+      y: 140 + Math.floor(index / 5) * 160,
+      vx: 0,
+      vy: 0
+    }));
+
+    edges = (data.references || []).map((r) => ({
+      source: r.sourceProjectId,
+      target: r.targetProjectId
+    }));
+
+    layoutKey = data.layoutKey || "";
+    callGraphContentWidth = 0;
+    updateCanvasDimensions();
+    applyLayoutPositions(data.layoutPositions);
+    const hasSavedLayout = data.layoutPositions && Object.keys(data.layoutPositions).length > 0;
+    if (!hasSavedLayout) {
+      for (let i = 0; i < 120; i++) {
+        tickPhysics(0.82);
+      }
+    }
+    updateStatusBar();
+    draw();
   }
 
   function buildNamespaceMap(data) {
@@ -472,15 +881,26 @@
     cancelAnimationFrame(animationFrame);
     pinnedNamespaceClusters.clear();
     selectedNamespaceClusterId = null;
+    namespaceAccessFilters.clear();
+    namespaceAnchorPinned = false;
     namespaceClusters = (data.clusters || []).map((c) => ({ ...c, x: 0, y: 0, w: 140, h: 78 }));
     namespaceEdges = data.clusterEdges || [];
     namespaceRoot = data.rootNamespace || data.projectName || "";
     layoutKey = data.layoutKey || "";
-    restoreArchitectureLegend();
+    const lang = data.projectLanguage || 1;
+    namespaceProjectAnchor = {
+      x: getLayoutViewportWidth() / 2,
+      y: 118,
+      name: data.projectName || namespaceRoot || "Project",
+      language: lang,
+      targetFramework: data.targetFramework || ""
+    };
+    setNamespaceLegend();
     layoutNamespaceMap();
     applyLayoutPositions(data.layoutPositions);
+    updateCanvasDimensions();
     updateStatusBar();
-    draw();
+    animate();
   }
 
   function layoutNamespaceMap() {
@@ -490,7 +910,7 @@
     const gapX = 28;
     const gapY = 36;
     const startX = 72;
-    const startY = 130;
+    const startY = 210;
     namespaceClusters.forEach((cluster, index) => {
       if (pinnedNamespaceClusters.has(cluster.id)) {
         return;
@@ -505,7 +925,6 @@
   }
 
   function layoutCallGraph() {
-    const topOffset = 200;
     const byDepth = {};
     for (const node of nodes) {
       if (!byDepth[node.depth]) {
@@ -518,27 +937,48 @@
       .map((d) => Number(d))
       .sort((a, b) => a - b);
 
-    const verticalGap = 96;
-    depths.forEach((depth, rowIndex) => {
-      const row = byDepth[depth];
-      const horizontalGap = Math.min(
-        200,
-        Math.max(110, (canvas.clientWidth - 100) / Math.max(row.length, 1))
-      );
-      const rowWidth = (row.length - 1) * horizontalGap;
-      const startX = (canvas.clientWidth - rowWidth) / 2;
+    const horizontalGap = 148;
+    const rowPadding = 96;
+    const primaryRowY = 196;
+    const secondaryRowStartY = 292;
+    const verticalGap = 104;
+
+    let maxRowWidth = 0;
+    for (const depth of depths) {
+      const count = byDepth[depth].length;
+      maxRowWidth = Math.max(maxRowWidth, Math.max(0, (count - 1) * horizontalGap));
+    }
+
+    const layoutWidth = Math.max(getLayoutViewportWidth(), maxRowWidth + rowPadding * 2);
+    const centerX = layoutWidth / 2;
+
+    depths.forEach((depth) => {
+      const row = byDepth[depth].slice().sort((a, b) => a.name.localeCompare(b.name));
+      const rowWidth = Math.max(0, (row.length - 1) * horizontalGap);
+      const startX = centerX - rowWidth / 2;
       row.forEach((node, index) => {
         if (pinnedCallNodes.has(node.id)) {
           return;
         }
         node.x = startX + index * horizontalGap;
-        node.y = topOffset + rowIndex * verticalGap;
+        if (depth === 0) {
+          node.y = primaryRowY;
+        } else {
+          const depthIndex = depths.indexOf(depth);
+          const secondaryIndex = Math.max(0, depthIndex - (depths[0] === 0 ? 1 : 0));
+          node.y = secondaryRowStartY + secondaryIndex * verticalGap;
+        }
       });
     });
 
+    callGraphContentWidth = layoutWidth;
+
     if (callGraphAnchor && !callAnchorPinned) {
-      callGraphAnchor.x = canvas.clientWidth / 2;
+      callGraphAnchor.x = centerX;
+      callGraphAnchor.y = 118;
     }
+
+    finalizeCallGraphLayout();
   }
 
   function clearSelection() {
@@ -736,7 +1176,7 @@
     const y = node.y - height / 2;
     const fill = css("--dg-node-fill", "#ffffff");
     const border = css("--dg-card-border", css("--dg-border", "#b8b8b8"));
-    const accent = (accessibilityStyle[node.accessibility] || accessibilityStyle.unknown).color;
+    const accent = accessibilityAccentColor(node.accessibility);
 
     ctx.fillStyle = fill;
     ctx.strokeStyle = border;
@@ -768,44 +1208,57 @@
   }
 
   function drawNamespaceMapView() {
+    const visible = visibleNamespaceClusters();
     if (namespaceClusters.length === 0) {
       return;
     }
 
-    const minX = Math.min(...namespaceClusters.map((c) => c.x)) - 24;
-    const minY = Math.min(...namespaceClusters.map((c) => c.y)) - 36;
-    const maxX = Math.max(...namespaceClusters.map((c) => c.x + c.w)) + 24;
-    const maxY = Math.max(...namespaceClusters.map((c) => c.y + c.h)) + 24;
-
-    ctx.fillStyle = css("--dg-surface", "#ffffff");
-    ctx.strokeStyle = css("--dg-card-border", css("--dg-border", "#b8b8b8"));
-    ctx.lineWidth = theme === "dark" ? 2 : 2.5;
-    if (ctx.roundRect) {
-      ctx.beginPath();
-      ctx.roundRect(minX, minY, maxX - minX, maxY - minY, 10);
-      ctx.fill();
-      ctx.stroke();
-    } else {
-      ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
-      ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+    if (namespaceProjectAnchor) {
+      for (const cluster of visible) {
+        drawCallEdge(
+          namespaceProjectAnchor,
+          { x: cluster.x + cluster.w / 2, y: cluster.y + cluster.h / 2 },
+          { dotted: true, fromAnchor: true }
+        );
+      }
     }
 
-    ctx.fillStyle = css("--dg-node-label", "#1e1e1e");
-    ctx.font = "600 14px Segoe UI Variable, Segoe UI, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(namespaceRoot, minX + 14, minY + 12);
+    const bounds = computeNamespaceFrameBounds(visible.length ? visible : namespaceClusters);
+    if (bounds) {
+      const { minX, minY, maxX, maxY } = bounds;
+      ctx.fillStyle = css("--dg-surface", "#ffffff");
+      ctx.strokeStyle = css("--dg-card-border", css("--dg-border", "#b8b8b8"));
+      ctx.lineWidth = theme === "dark" ? 2 : 2.5;
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(minX, minY, maxX - minX, maxY - minY, 10);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+        ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+      }
+
+      ctx.fillStyle = css("--dg-node-label", "#1e1e1e");
+      ctx.font = "600 14px Segoe UI Variable, Segoe UI, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(namespaceRoot, minX + 14, minY + 22);
+    }
 
     for (const edge of namespaceEdges) {
       const source = namespaceClusters.find((c) => c.id === edge.sourceId);
       const target = namespaceClusters.find((c) => c.id === edge.targetId);
       if (!source || !target) continue;
+      if (!clusterMatchesAccessFilter(source) || !clusterMatchesAccessFilter(target)) {
+        continue;
+      }
       drawCallEdge(
         { x: source.x + source.w / 2, y: source.y + source.h / 2 },
         { x: target.x + target.w / 2, y: target.y + target.h / 2 }
       );
     }
 
-    for (const cluster of namespaceClusters) {
+    for (const cluster of visible) {
       const selected = selectedNamespaceClusterId === cluster.id;
       ctx.fillStyle = css("--dg-node-fill", "#ffffff");
       ctx.strokeStyle = selected ? css("--dg-accent", "#0078d4") : css("--dg-card-border", css("--dg-border", "#b8b8b8"));
@@ -832,19 +1285,29 @@
         ctx.fillText(sample.length > 22 ? sample.slice(0, 20) + "…" : sample, cluster.x + cluster.w / 2, cluster.y + 54);
       }
     }
+
+    if (namespaceProjectAnchor) {
+      drawAnchorCircle(namespaceProjectAnchor);
+    }
   }
 
   function drawCallGraphView() {
-    const nodesWithCallIn = new Set(edges.map((e) => e.target));
-    const nodesWithCallOut = new Set(edges.map((e) => e.source));
+    const visible = visibleCallGraphNodes();
+    const visibleIds = new Set(visible.map((n) => n.id));
 
     if (callGraphAnchor) {
-      for (const node of nodes) {
+      for (const node of visible) {
+        if (currentView === "callGraph" && node.depth !== 0) {
+          continue;
+        }
         drawCallEdge(callGraphAnchor, node, { dotted: true, fromAnchor: true });
       }
     }
 
     for (const edge of edges) {
+      if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target)) {
+        continue;
+      }
       const source = nodes.find((n) => n.id === edge.source);
       const target = nodes.find((n) => n.id === edge.target);
       if (!source || !target) {
@@ -853,14 +1316,7 @@
       drawCallEdge(source, target);
     }
 
-    for (const node of nodes) {
-      if (
-        callGraphAnchor &&
-        (node.depth === 0 || nodesWithCallIn.has(node.id) || nodesWithCallOut.has(node.id))
-      ) {
-        const accent = (accessibilityStyle[node.accessibility] || accessibilityStyle.unknown).color;
-        drawFocusDots(node, accent);
-      }
+    for (const node of visible) {
       drawCallNodeBox(node);
     }
 
@@ -870,14 +1326,16 @@
   }
 
   function draw() {
-    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    const drawW = canvas.width / (window.devicePixelRatio || 1);
+    const drawH = canvas.height / (window.devicePixelRatio || 1);
+    ctx.clearRect(0, 0, drawW, drawH);
 
     if (currentView === "namespaceMap") {
       drawNamespaceMapView();
       return;
     }
 
-    if (currentView === "callGraph") {
+    if (currentView === "callGraph" || currentView === "typeGraph") {
       drawCallGraphView();
       return;
     }
@@ -928,8 +1386,8 @@
       ctx.textBaseline = "middle";
       ctx.fillText(
         t("emptyGraphHint", "O grafo ocupa toda a área até você selecionar um projeto."),
-        canvas.clientWidth / 2,
-        canvas.clientHeight / 2
+        drawW / 2,
+        drawH / 2
       );
       return;
     }
@@ -957,8 +1415,12 @@
       ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.lineWidth = isSelected ? 4 : onCycle ? 3 : 2;
-      ctx.strokeStyle = onCycle ? css("--dg-cycle-edge", "#d13438") : style.color;
+      ctx.lineWidth = isSelected ? 4 : onCycle ? 3 : node.isDefinition ? 4 : 2;
+      ctx.strokeStyle = onCycle
+        ? css("--dg-cycle-edge", "#d13438")
+        : node.isDefinition
+          ? css("--dg-accent", "#0e639c")
+          : style.color;
       ctx.stroke();
 
       if (isSelected) {
@@ -976,7 +1438,12 @@
 
       ctx.fillStyle = subColor;
       ctx.font = "11px Segoe UI Variable, Segoe UI, sans-serif";
-      const subtitle = node.targetFramework || "Class Library";
+      let subtitle = node.targetFramework || "Class Library";
+      if (currentView === "impactGraph" && node.usageCount > 0) {
+        subtitle = `${node.usageCount} ${t("usages", "uso(s)")}`;
+      } else if (currentView === "architecture" && node.solutionFolder) {
+        subtitle = node.solutionFolder.length > 18 ? node.solutionFolder.slice(0, 16) + "…" : node.solutionFolder;
+      }
       ctx.fillText(subtitle.length > 18 ? subtitle.slice(0, 16) + "…" : subtitle, node.x, node.y + 14);
 
       ctx.fillStyle = labelColor;
@@ -987,11 +1454,17 @@
 
   function animate() {
     focusPhase += 0.04;
-    if (currentView === "architecture" && !dragNode) {
+    if ((currentView === "architecture" || currentView === "impactGraph") && !dragNode) {
       tickPhysics(0.9);
     }
     draw();
-    if (currentView === "architecture" || currentView === "callGraph") {
+    if (
+      currentView === "architecture" ||
+      currentView === "impactGraph" ||
+      currentView === "callGraph" ||
+      currentView === "typeGraph" ||
+      currentView === "namespaceMap"
+    ) {
       animationFrame = requestAnimationFrame(animate);
     }
   }
@@ -1038,7 +1511,7 @@
       hit.ref.y = y;
       return;
     }
-    if (hit.kind === "callAnchor") {
+    if (hit.kind === "callAnchor" || hit.kind === "nsAnchor") {
       hit.ref.x = x;
       hit.ref.y = y;
       return;
@@ -1064,6 +1537,7 @@
     if (hit.kind === "archNode") pinned.add(hit.ref.id);
     if (hit.kind === "callNode") pinnedCallNodes.add(hit.ref.id);
     if (hit.kind === "callAnchor") callAnchorPinned = true;
+    if (hit.kind === "nsAnchor") namespaceAnchorPinned = true;
     if (hit.kind === "nsCluster") pinnedNamespaceClusters.add(hit.ref.id);
     if (hit.kind === "nsFrame") {
       for (const cluster of namespaceClusters) {
@@ -1076,6 +1550,14 @@
     if (window.chrome && window.chrome.webview) {
       window.chrome.webview.postMessage(
         JSON.stringify({ type: "callNodeClick", nodeId: nodeId })
+      );
+    }
+  }
+
+  function postTypeNodeClick(nodeId) {
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(
+        JSON.stringify({ type: "typeNodeClick", nodeId: nodeId })
       );
     }
   }
@@ -1150,7 +1632,11 @@
           selectedId = hit.ref.id;
           updateStatusBar();
           draw();
-          postCallNodeClick(hit.ref.id);
+          if (currentView === "typeGraph") {
+            postTypeNodeClick(hit.ref.id);
+          } else {
+            postCallNodeClick(hit.ref.id);
+          }
         }
       } else {
         pinDragTarget(hit);
@@ -1189,22 +1675,213 @@
     if (hit.kind === "archNode") pinned.delete(hit.ref.id);
     if (hit.kind === "callNode") pinnedCallNodes.delete(hit.ref.id);
     if (hit.kind === "callAnchor") callAnchorPinned = false;
+    if (hit.kind === "nsAnchor") namespaceAnchorPinned = false;
     if (hit.kind === "nsCluster") pinnedNamespaceClusters.delete(hit.ref.id);
-    if (currentView === "callGraph") layoutCallGraph();
+    if (currentView === "callGraph" || currentView === "typeGraph") layoutCallGraph();
     if (currentView === "namespaceMap") layoutNamespaceMap();
     draw();
   });
+
+  function mermaidEscapeLabel(text) {
+    return String(text || " ")
+      .replace(/"/g, "#quot;")
+      .replace(/\n/g, " ")
+      .replace(/\]/g, "#93;");
+  }
+
+  function safeExportBaseName(raw) {
+    const cleaned = String(raw || "graph")
+      .replace(/[^\w\-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 72);
+    return cleaned || "dotnet-graph";
+  }
+
+  function getExportBaseName() {
+    if (currentView === "callGraph") {
+      return safeExportBaseName("call-graph-" + (callGraphTitle || "project"));
+    }
+    if (currentView === "typeGraph") {
+      return safeExportBaseName("type-graph-" + (callGraphTitle || "project"));
+    }
+    if (currentView === "namespaceMap") {
+      return safeExportBaseName("namespaces-" + (namespaceRoot || "project"));
+    }
+    if (currentView === "impactGraph") {
+      return safeExportBaseName("impact-" + (impactGraphTitle || "symbol"));
+    }
+    return safeExportBaseName("architecture");
+  }
+
+  function graphHasExportableContent() {
+    if (currentView === "namespaceMap") {
+      return namespaceClusters.length > 0;
+    }
+    return nodes.length > 0 || !!callGraphAnchor;
+  }
+
+  function postExportResult(payload) {
+    if (!(window.chrome && window.chrome.webview)) {
+      return;
+    }
+    window.chrome.webview.postMessage(JSON.stringify({ type: "exportResult", ...payload }));
+  }
+
+  function buildMermaidDiagram() {
+    const lines = ["flowchart LR"];
+    const idMap = new Map();
+
+    function nodeId(key) {
+      if (!idMap.has(key)) {
+        const slug = String(key)
+          .replace(/[^a-zA-Z0-9_]/g, "_")
+          .slice(0, 48);
+        idMap.set(key, "n" + idMap.size + "_" + (slug || "x"));
+      }
+      return idMap.get(key);
+    }
+
+    function declareNode(key, label, shape) {
+      const id = nodeId(key);
+      const text = mermaidEscapeLabel(label);
+      if (shape === "circle") {
+        lines.push(`  ${id}(("${text}"))`);
+      } else if (shape === "stadium") {
+        lines.push(`  ${id}(["${text}"])`);
+      } else {
+        lines.push(`  ${id}["${text}"]`);
+      }
+      return id;
+    }
+
+    function link(fromKey, toKey, style) {
+      const from = nodeId(fromKey);
+      const to = nodeId(toKey);
+      lines.push(`  ${from} ${style || "-->"} ${to}`);
+    }
+
+    lines.push(`  %% Dotnet Graph · view: ${currentView}`);
+
+    if (currentView === "namespaceMap") {
+      for (const cluster of namespaceClusters) {
+        const label = `${cluster.label || cluster.id} (${cluster.typeCount || 0} types)`;
+        declareNode(cluster.id, label, "box");
+      }
+      for (const edge of namespaceEdges) {
+        link(edge.sourceId, edge.targetId);
+      }
+      if (namespaceProjectAnchor && namespaceClusters.length > 0) {
+        declareNode("__ns_anchor__", namespaceProjectAnchor.name || namespaceRoot, "circle");
+        for (const cluster of namespaceClusters) {
+          link("__ns_anchor__", cluster.id, "-.->");
+        }
+      }
+      return lines.join("\n");
+    }
+
+    if (currentView === "callGraph" || currentView === "typeGraph") {
+      if (callGraphAnchor) {
+        const anchorLabel = `${callGraphAnchor.name}${callGraphAnchor.targetFramework ? " · " + callGraphAnchor.targetFramework : ""}`;
+        declareNode("__anchor__", anchorLabel, "circle");
+      }
+      for (const node of nodes) {
+        const label = node.subtitle ? `${node.name} — ${node.subtitle}` : node.name;
+        declareNode(node.id, label, "box");
+      }
+      if (callGraphAnchor) {
+        for (const node of nodes) {
+          if (currentView === "callGraph" && node.depth !== 0) {
+            continue;
+          }
+          link("__anchor__", node.id, "-.->");
+        }
+      }
+      for (const edge of edges) {
+        link(edge.source, edge.target);
+      }
+      return lines.join("\n");
+    }
+
+    for (const node of nodes) {
+      const tf = node.targetFramework ? " · " + node.targetFramework : "";
+      const usage =
+        currentView === "impactGraph" && node.usageCount
+          ? ` · ${node.usageCount} ${t("usages", "uso(s)")}`
+          : "";
+      const label = `${node.name}${tf}${usage}`;
+      declareNode(node.id, label, node.isDefinition ? "circle" : "box");
+    }
+    for (const edge of edges) {
+      link(edge.source, edge.target);
+    }
+    return lines.join("\n");
+  }
+
+  function capturePngBase64() {
+    draw();
+    return canvas.toDataURL("image/png");
+  }
+
+  function handleExportRequest(format) {
+    if (!graphHasExportableContent()) {
+      postExportResult({ success: false, format, error: "empty" });
+      return;
+    }
+
+    if (format === "png") {
+      try {
+        postExportResult({
+          success: true,
+          format: "png",
+          pngBase64: capturePngBase64(),
+          fileName: getExportBaseName() + ".png",
+          view: currentView
+        });
+      } catch (err) {
+        postExportResult({ success: false, format: "png", error: String(err) });
+      }
+      return;
+    }
+
+    if (format === "mermaid") {
+      try {
+        postExportResult({
+          success: true,
+          format: "mermaid",
+          mermaid: buildMermaidDiagram(),
+          fileName: getExportBaseName() + ".mmd",
+          view: currentView
+        });
+      } catch (err) {
+        postExportResult({ success: false, format: "mermaid", error: String(err) });
+      }
+      return;
+    }
+
+    postExportResult({ success: false, format, error: "unsupported" });
+  }
 
   function onHostMessage(event) {
     try {
       const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
       if (!data) return;
+      if (data.type === "exportRequest") {
+        handleExportRequest(data.format);
+        return;
+      }
       if (data.type === "setTheme") {
         applyTheme(data.theme);
         return;
       }
       if (data.type === "setLocale" && data.strings) {
         localeStrings = { ...localeStrings, ...data.strings };
+        const hintEl = document.getElementById("hint");
+        if (hintEl && data.strings.hint) {
+          hintEl.textContent = data.strings.hint;
+        }
+        if (statusSummary && data.strings.statusNoGraph && nodes.length === 0) {
+          statusSummary.textContent = data.strings.statusNoGraph;
+        }
         updateStatusBar();
         draw();
         return;
@@ -1231,6 +1908,16 @@
       }
       if (data.view === "namespaceMap") {
         buildNamespaceMap(data);
+        return;
+      }
+      if (data.view === "typeGraph") {
+        buildTypeGraph(data);
+        return;
+      }
+      if (data.view === "impactGraph") {
+        buildImpactGraph(data);
+        cancelAnimationFrame(animationFrame);
+        animate();
         return;
       }
       if (data.view === "architecture" || Array.isArray(data.projects)) {

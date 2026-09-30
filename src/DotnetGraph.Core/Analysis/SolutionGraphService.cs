@@ -59,7 +59,8 @@ public sealed class SolutionGraphService
                 TargetFramework = msbuildProject.GetPropertyValue("TargetFramework")
                     ?? msbuildProject.GetPropertyValue("TargetFrameworks")
                     ?? string.Empty,
-                OutputType = msbuildProject.GetPropertyValue("OutputType") ?? string.Empty
+                OutputType = msbuildProject.GetPropertyValue("OutputType") ?? string.Empty,
+                SolutionFolderPath = input.SolutionFolderPath ?? string.Empty
             });
         }
 

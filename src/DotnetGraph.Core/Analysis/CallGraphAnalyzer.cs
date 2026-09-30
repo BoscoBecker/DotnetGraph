@@ -16,21 +16,21 @@ public sealed class CallGraphAnalyzer
 
         if (project.Language != ProjectLanguage.CSharp || !File.Exists(project.ProjectPath))
         {
-            return Empty(project, "Call graph disponível apenas para projetos C#.");
+            return Empty(project, GraphMessageKeys.CallGraphCSharpOnly);
         }
 
         using var projectCache = new MsBuildProjectCache();
         var compilation = CSharpCompilationFactory.TryCreate(project.ProjectPath, projectCache);
         if (compilation is null)
         {
-            return Empty(project, "Não foi possível compilar o projeto para análise.");
+            return Empty(project, GraphMessageKeys.CallGraphCompileFailed);
         }
 
         var types = CollectTypes(compilation);
         var entryType = ResolveEntryType(types, rootTypeName);
         if (entryType is null)
         {
-            return Empty(project, "Nenhum tipo de entrada encontrado (*Controller ou tipo disponível).");
+            return Empty(project, GraphMessageKeys.CallGraphNoEntryType);
         }
 
         var nodes = new Dictionary<string, CallGraphNode>(StringComparer.Ordinal);
@@ -57,7 +57,7 @@ public sealed class CallGraphAnalyzer
         var entryMethods = GetOrdinaryMethods(entryType);
         if (entryMethods.Count == 0)
         {
-            return Empty(project, "Nenhum método encontrado no tipo de entrada.");
+            return Empty(project, GraphMessageKeys.CallGraphNoEntryMethods);
         }
 
         if (!string.IsNullOrWhiteSpace(rootMethodName))
@@ -67,7 +67,7 @@ public sealed class CallGraphAnalyzer
                 .ToList();
             if (entryMethods.Count == 0)
             {
-                return Empty(project, $"Método '{rootMethodName}' não encontrado.");
+                return Empty(project, GraphMessageKeys.CallGraphMethodNotFound, rootMethodName);
             }
         }
 
@@ -332,13 +332,14 @@ public sealed class CallGraphAnalyzer
     private static string GetMethodKey(IMethodSymbol method) =>
         method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
-    private static CallGraphResult Empty(ProjectNode project, string message)
+    private static CallGraphResult Empty(ProjectNode project, string messageKey, string? formatArg = null)
     {
         return new CallGraphResult
         {
             View = "callGraph",
-            Title = message,
+            Title = messageKey,
             ProjectName = project.Name,
+            EntryMethod = formatArg ?? string.Empty,
             TargetFramework = project.TargetFramework,
             ProjectLanguage = (int)project.Language,
             Nodes = new[]
@@ -346,7 +347,7 @@ public sealed class CallGraphAnalyzer
                 new CallGraphNode
                 {
                     Id = "info",
-                    Label = message,
+                    Label = messageKey,
                     Subtitle = project.Name,
                     Depth = 0,
                     Accessibility = "unknown"

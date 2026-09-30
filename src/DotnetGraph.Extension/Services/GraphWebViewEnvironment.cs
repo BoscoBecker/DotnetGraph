@@ -37,7 +37,7 @@ internal static class GraphWebViewEnvironment
             _environment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: null,
                 userDataFolder: UserDataFolder,
-                options: new CoreWebView2EnvironmentOptions()).ConfigureAwait(true);
+                options: new CoreWebView2EnvironmentOptions()).ConfigureAwait(false);
 
             return _environment;
         }

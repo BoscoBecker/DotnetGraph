@@ -11,6 +11,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace DotnetGraph.Extension;
 
+/// <summary>
+/// Loads on demand (no startup AutoLoad). Settings I/O runs off the UI thread during <see cref="InitializeAsync"/>.
+/// </summary>
 [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
 [Guid(PackageGuids.PackageString)]
 [ProvideMenuResource("Menus.ctmenu", 1000)]
@@ -21,19 +24,20 @@ public sealed class DotnetGraphPackage : AsyncPackage
 
     protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
     {
-        await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-        Instance = this;
         try
         {
-            UserGraphSettings.Load();
+            await Task.Run(UserGraphSettings.Load, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             ActivityLog.LogError(GetType().Name, ex.ToString());
         }
 
-        await ShowGraphCommand.InitializeAsync(this);
-        await base.InitializeAsync(cancellationToken, progress);
+        await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+        Instance = this;
+
+        await ShowGraphCommand.InitializeAsync(this).ConfigureAwait(true);
+        await base.InitializeAsync(cancellationToken, progress).ConfigureAwait(true);
     }
 
     protected override void Dispose(bool disposing)

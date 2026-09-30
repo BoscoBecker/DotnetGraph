@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="DotnetGraph.Extension.JBosco.2026" Version="0.1.8" Language="en-US" Publisher="DotnetGraph" />
+    <Identity Id="DotnetGraph.Extension.JBosco.2026" Version="0.2.0" Language="en-US" Publisher="João Bosco" />
     <DisplayName>Dotnet Graph</DisplayName>
-    <Description xml:space="preserve">Grafo interativo de referências entre projetos (C#, F# e VB) no estilo .NET Aspire, com detalhes de tipos ao clicar em cada nó.</Description>
+    <Description xml:space="preserve">Interactive graph of project references (C#, F#, and VB) in .NET Aspire style, with type details when you click each node.</Description>
     <Icon>Resources\Icons\PackageIcon.png</Icon>
     <Tags>graph;dependency;architecture;csharp;fsharp;vb</Tags>
   </Metadata>

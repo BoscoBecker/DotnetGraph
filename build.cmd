@@ -13,7 +13,7 @@ set "VSIX="
 call "%~dp0scripts\ensure-icons.cmd" /force
 if errorlevel 1 exit /b 1
 
-echo [DotnetGraph] Restaurando pacotes...
+echo [DotnetGraph] Restoring packages...
 
 dotnet restore DotnetGraph.sln
 
@@ -21,7 +21,7 @@ if errorlevel 1 exit /b 1
 
 
 
-echo [DotnetGraph] Compilando Release (gera VSIX)...
+echo [DotnetGraph] Building Release (produces VSIX)...
 
 dotnet build src\DotnetGraph.Extension\DotnetGraph.Extension.csproj -c Release --no-restore
 
@@ -47,9 +47,9 @@ for /f "delims=" %%F in ('dir /s /b "src\DotnetGraph.Extension\bin\Release\*.vsi
 
 echo.
 
-echo AVISO: build OK, mas nenhum .vsix foi encontrado.
+echo WARNING: build succeeded, but no .vsix was found.
 
-echo Confira se a carga "Desenvolvimento de extensao do Visual Studio" esta instalada.
+echo Ensure the "Visual Studio extension development" workload is installed.
 
 exit /b 1
 
@@ -59,13 +59,12 @@ exit /b 1
 
 echo.
 
-echo VSIX gerado em:
+echo VSIX output:
 
 echo   %CD%\%VSIX%
 
 echo.
 
-echo Instale: duplo clique no .vsix ou Extensions ^> Manage Extensions ^> Install from a file
+echo Install: double-click the .vsix or Extensions ^> Manage Extensions ^> Install from a file
 
 endlocal
-

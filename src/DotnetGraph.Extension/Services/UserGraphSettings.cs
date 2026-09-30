@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DotnetGraph.Extension.Services;
 
@@ -27,8 +29,29 @@ internal static class UserGraphSettings
     public static double DetailPanelWidth { get; private set; } = 360;
 
     private static readonly Dictionary<string, Dictionary<string, LayoutPoint>> Layouts = new(StringComparer.OrdinalIgnoreCase);
+    private static int _loaded;
+    private static readonly object LoadSync = new();
+
+    public static Task EnsureLoadedAsync(CancellationToken cancellationToken = default) =>
+        Volatile.Read(ref _loaded) != 0
+            ? Task.CompletedTask
+            : Task.Run(Load, cancellationToken);
 
     public static void Load()
+    {
+        lock (LoadSync)
+        {
+            if (Volatile.Read(ref _loaded) != 0)
+            {
+                return;
+            }
+
+            LoadCore();
+            Interlocked.Exchange(ref _loaded, 1);
+        }
+    }
+
+    private static void LoadCore()
     {
         try
         {
@@ -72,6 +95,7 @@ internal static class UserGraphSettings
                     Layouts[entry.Key] = new Dictionary<string, LayoutPoint>(entry.Value, StringComparer.OrdinalIgnoreCase);
                 }
             }
+
         }
         catch (IOException)
         {

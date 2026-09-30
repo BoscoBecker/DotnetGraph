@@ -15,6 +15,8 @@ public sealed class ProjectNode
     public ProjectLanguage Language { get; set; }
     public string TargetFramework { get; set; } = string.Empty;
     public string OutputType { get; set; } = string.Empty;
+    /// <summary>Solution Explorer folder path (e.g. "src\\Services"), empty for solution root.</summary>
+    public string SolutionFolderPath { get; set; } = string.Empty;
 }
 
 public sealed class ProjectReferenceEdge
@@ -56,4 +58,5 @@ public sealed class SolutionProjectInput
 {
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
+    public string SolutionFolderPath { get; set; } = string.Empty;
 }

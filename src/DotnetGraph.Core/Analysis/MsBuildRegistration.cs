@@ -20,7 +20,7 @@ public static class MsBuildRegistration
             return;
         }
 
-        // Visual Studio (e devenv) já carrega Microsoft.Build 15.x/17.x — não registrar de novo.
+        // Visual Studio (and devenv) already load Microsoft.Build 15.x/17.x — do not register again.
         if (IsMsBuildAlreadyLoaded())
         {
             return;
@@ -32,7 +32,7 @@ public static class MsBuildRegistration
         }
         catch (InvalidOperationException)
         {
-            // Host já inicializou MSBuild antes do Locator.
+            // Host already initialized MSBuild before the Locator.
         }
     }
 

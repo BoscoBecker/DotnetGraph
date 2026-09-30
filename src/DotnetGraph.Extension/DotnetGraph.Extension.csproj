@@ -51,7 +51,11 @@
   <ItemGroup>
     <Resource Include="Resources\Icons\PackageIcon.png" />
     <Resource Include="Resources\Icons\CommandGraph16.png" />
+    <Resource Include="Resources\Icons\CommandGraph32.png" />
     <Resource Include="Resources\Icons\CommandGraphIcons.png" />
+    <Content Include="DotnetGraph.imagemanifest">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
     <Content Include="Resources\Icons\**\*">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>

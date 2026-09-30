@@ -1,3 +1,4 @@
+using DotnetGraph.Core.Models;
 using Microsoft.Build.Evaluation;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -6,6 +7,31 @@ namespace DotnetGraph.Core.Analysis;
 
 internal static class CSharpCompilationFactory
 {
+    public static CSharpCompilation? TryCreateWithSolutionReferences(
+        string projectPath,
+        MsBuildProjectCache projectCache,
+        SolutionGraph graph)
+    {
+        var compilation = TryCreate(projectPath, projectCache);
+        if (compilation is null)
+        {
+            return null;
+        }
+
+        var extraRefs = CollectProjectReferenceAssemblies(projectPath, projectCache, graph);
+        if (extraRefs.Count == 0)
+        {
+            return compilation;
+        }
+
+        var merged = compilation.References
+            .Concat(extraRefs)
+            .Distinct(MetadataReferenceComparer.Instance)
+            .ToList();
+
+        return compilation.WithReferences(merged);
+    }
+
     public static CSharpCompilation? TryCreate(string projectPath, MsBuildProjectCache projectCache)
     {
         if (!projectPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
@@ -128,5 +154,93 @@ internal static class CSharpCompilationFactory
         }
 
         return null;
+    }
+
+    private static List<MetadataReference> CollectProjectReferenceAssemblies(
+        string projectPath,
+        MsBuildProjectCache projectCache,
+        SolutionGraph graph)
+    {
+        var results = new List<MetadataReference>();
+        if (!projectCache.TryGetProject(projectPath, out var msbuildProject) || msbuildProject is null)
+        {
+            return results;
+        }
+
+        var projectDir = Path.GetDirectoryName(projectPath)!;
+
+        foreach (var reference in msbuildProject.GetItems("ProjectReference"))
+        {
+            var include = reference.EvaluatedInclude;
+            if (string.IsNullOrWhiteSpace(include))
+            {
+                continue;
+            }
+
+            var referencedPath = Path.GetFullPath(Path.Combine(projectDir, include));
+            var assemblyPath = ResolveOutputAssemblyPath(referencedPath, projectCache);
+            if (!string.IsNullOrWhiteSpace(assemblyPath) && File.Exists(assemblyPath))
+            {
+                results.Add(MetadataReference.CreateFromFile(assemblyPath!));
+            }
+        }
+
+        return results;
+    }
+
+    private static string? ResolveOutputAssemblyPath(string projectPath, MsBuildProjectCache projectCache)
+    {
+        if (!projectCache.TryGetProject(projectPath, out var msbuildProject) || msbuildProject is null)
+        {
+            return null;
+        }
+
+        var projectDir = Path.GetDirectoryName(projectPath)!;
+        var assemblyName = msbuildProject.GetPropertyValue("AssemblyName");
+        if (string.IsNullOrWhiteSpace(assemblyName))
+        {
+            assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+        }
+
+        var outputPath = msbuildProject.GetPropertyValue("OutputPath");
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            outputPath = "bin\\Debug\\";
+        }
+
+        var fullOutputDir = Path.GetFullPath(Path.Combine(projectDir, outputPath));
+        var dllPath = Path.Combine(fullOutputDir, assemblyName + ".dll");
+        if (File.Exists(dllPath))
+        {
+            return dllPath;
+        }
+
+        var exePath = Path.Combine(fullOutputDir, assemblyName + ".exe");
+        return File.Exists(exePath) ? exePath : null;
+    }
+
+    private sealed class MetadataReferenceComparer : IEqualityComparer<MetadataReference>
+    {
+        public static readonly MetadataReferenceComparer Instance = new();
+
+        public bool Equals(MetadataReference? x, MetadataReference? y)
+        {
+            if (x is null || y is null)
+            {
+                return false;
+            }
+
+            if (x is PortableExecutableReference px && y is PortableExecutableReference py)
+            {
+                return string.Equals(px.FilePath, py.FilePath, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return ReferenceEquals(x, y);
+        }
+
+        public int GetHashCode(MetadataReference obj) =>
+            obj is PortableExecutableReference pe && pe.FilePath is not null
+                ? StringComparer.OrdinalIgnoreCase.GetHashCode(pe.FilePath)
+                : obj.GetHashCode();
     }
 }

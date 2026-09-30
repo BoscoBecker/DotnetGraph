@@ -31,14 +31,15 @@ internal sealed class ShowGraphCommand
 
     private void Execute(object sender, EventArgs e)
     {
-        ThreadHelper.ThrowIfNotOnUIThread();
         ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
         {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
             var window = await _package.ShowToolWindowAsync(
                 typeof(DependencyGraphToolWindow),
                 0,
                 create: true,
-                cancellationToken: CancellationToken.None);
+                cancellationToken: CancellationToken.None).ConfigureAwait(true);
 
             if (window?.Frame is IVsWindowFrame frame)
             {

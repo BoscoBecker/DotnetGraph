@@ -14,14 +14,14 @@ public sealed class NamespaceMapAnalyzer
 
         if (project.Language != ProjectLanguage.CSharp || !File.Exists(project.ProjectPath))
         {
-            return Empty(project, "Namespace map disponível apenas para projetos C#.");
+            return Empty(project, GraphMessageKeys.NamespaceCSharpOnly);
         }
 
         using var projectCache = new MsBuildProjectCache();
         var compilation = CSharpCompilationFactory.TryCreate(project.ProjectPath, projectCache);
         if (compilation is null)
         {
-            return Empty(project, "Não foi possível analisar namespaces.");
+            return Empty(project, GraphMessageKeys.NamespaceAnalyzeFailed);
         }
 
         var typesByCluster = new Dictionary<string, List<INamedTypeSymbol>>(StringComparer.Ordinal);
@@ -53,7 +53,7 @@ public sealed class NamespaceMapAnalyzer
 
         if (typesByCluster.Count == 0)
         {
-            return Empty(project, "Nenhum tipo encontrado para mapear namespaces.");
+            return Empty(project, GraphMessageKeys.NamespaceNoTypes);
         }
 
         var msbuildProject = projectCache.GetProject(project.ProjectPath);
@@ -75,13 +75,15 @@ public sealed class NamespaceMapAnalyzer
                     .OrderBy(n => n, StringComparer.Ordinal)
                     .Take(MaxSamplesPerCluster)
                     .ToList(),
-                SourceFiles = kvp.Value
-                    .SelectMany(t => t.Locations)
-                    .Where(l => l.IsInSource && !string.IsNullOrWhiteSpace(l.SourceTree?.FilePath))
-                    .Select(l => l.SourceTree!.FilePath)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-                    .Select(p => Path.GetFileName(p))
+                SourceFiles = BuildSourceFileNames(kvp.Value),
+                SourceFileLinks = BuildSourceFileLinks(kvp.Value),
+                Types = kvp.Value
+                    .Select(t => new NamespaceTypeEntry
+                    {
+                        Name = t.Name,
+                        Accessibility = MapAccessibility(t.DeclaredAccessibility)
+                    })
+                    .OrderBy(t => t.Name, StringComparer.Ordinal)
                     .ToList()
             })
             .ToList();
@@ -93,10 +95,76 @@ public sealed class NamespaceMapAnalyzer
             View = "namespaceMap",
             ProjectName = project.Name,
             RootNamespace = rootNamespace,
+            TargetFramework = project.TargetFramework,
+            ProjectLanguage = (int)project.Language,
             Clusters = clusters,
             ClusterEdges = clusterEdges
         };
     }
+
+    private static List<string> BuildSourceFileNames(IReadOnlyList<INamedTypeSymbol> types) =>
+        BuildSourceFileLinks(types).Select(f => f.FileName).ToList();
+
+    private static List<NamespaceClusterSourceFile> BuildSourceFileLinks(IReadOnlyList<INamedTypeSymbol> types)
+    {
+        var links = new Dictionary<string, NamespaceClusterSourceFile>(StringComparer.OrdinalIgnoreCase);
+        foreach (var type in types)
+        {
+            SyntaxTree? sourceTree = null;
+            var sourceLocation = default(Location);
+            var hasSource = false;
+            foreach (var location in type.Locations)
+            {
+                if (!location.IsInSource)
+                {
+                    continue;
+                }
+
+                var tree = location.SourceTree;
+                if (tree is null || string.IsNullOrWhiteSpace(tree.FilePath))
+                {
+                    continue;
+                }
+
+                sourceTree = tree;
+                sourceLocation = location;
+                hasSource = true;
+                break;
+            }
+
+            if (!hasSource || sourceTree is null)
+            {
+                continue;
+            }
+
+            var path = sourceTree.FilePath;
+            if (links.ContainsKey(path))
+            {
+                continue;
+            }
+
+            var lineSpan = sourceLocation.GetLineSpan();
+            links[path] = new NamespaceClusterSourceFile
+            {
+                FilePath = path,
+                FileName = Path.GetFileName(path),
+                Line = lineSpan.StartLinePosition.Line + 1
+            };
+        }
+
+        return links.Values.OrderBy(f => f.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static string MapAccessibility(Accessibility accessibility) => accessibility switch
+    {
+        Accessibility.Public => "public",
+        Accessibility.Internal => "internal",
+        Accessibility.Private => "private",
+        Accessibility.Protected => "protected",
+        Accessibility.ProtectedOrInternal => "protectedInternal",
+        Accessibility.ProtectedAndInternal => "protectedInternal",
+        _ => "unknown"
+    };
 
     private static string InferRootNamespaceFromTypes(IEnumerable<INamedTypeSymbol> types)
     {
