@@ -1,0 +1,777 @@
+<UserControl x:Class="DotnetGraph.Extension.ToolWindows.DependencyGraphControl"
+
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+             xmlns:local="clr-namespace:DotnetGraph.Extension.ToolWindows"
+
+             xmlns:vs="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0">
+
+    <UserControl.Resources>
+
+        <SolidColorBrush x:Key="SidebarLinkBrush" Color="#0E70C0"/>
+        <SolidColorBrush x:Key="GraphFluentSurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="GraphFluentSurfaceHoverBrush" Color="#F5F5F5"/>
+        <SolidColorBrush x:Key="GraphFluentBorderBrush" Color="#E1E1E1"/>
+        <SolidColorBrush x:Key="GraphFluentTextBrush" Color="#1E1E1E"/>
+        <SolidColorBrush x:Key="GraphFluentAccentBrush" Color="#0E639C"/>
+        <SolidColorBrush x:Key="GraphFluentAccentHoverBrush" Color="#1176B3"/>
+        <SolidColorBrush x:Key="GraphFluentAccentTextBrush" Color="#FFFFFF"/>
+
+        <Style x:Key="GraphFluentButton" TargetType="Button">
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="MinWidth" Value="72"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, sans-serif"/>
+            <Setter Property="Background" Value="{DynamicResource GraphFluentSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource GraphFluentBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource GraphFluentTextBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="FluentBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="FluentBorder" Property="Background" Value="{DynamicResource GraphFluentSurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="FluentBorder" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="FluentBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GraphFluentAccentButton" TargetType="Button" BasedOn="{StaticResource GraphFluentButton}">
+            <Setter Property="Background" Value="{DynamicResource GraphFluentAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource GraphFluentAccentHoverBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource GraphFluentAccentTextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="FluentAccentBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="FluentAccentBorder" Property="Background" Value="{DynamicResource GraphFluentAccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="FluentAccentBorder" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="FluentAccentBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GraphFluentIconButton" TargetType="Button">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinWidth" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="2,0,0,0"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Background" Value="{DynamicResource GraphFluentSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource GraphFluentBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource GraphFluentTextBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="FluentIconBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="FluentIconBorder" Property="Background" Value="{DynamicResource GraphFluentSurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="FluentIconBorder" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="FluentIconBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GraphFluentComboBoxItem" TargetType="ComboBoxItem">
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Background" Value="{DynamicResource GraphFluentSurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource GraphFluentTextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource GraphFluentSurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GraphFluentComboBox" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="Padding" Value="10,6,28,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="{DynamicResource GraphFluentSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource GraphFluentBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource GraphFluentTextBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource GraphFluentComboBoxItem}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid SnapsToDevicePixels="True">
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="ComboBoxBorder"
+                                                Background="{Binding Background, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                BorderBrush="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                BorderThickness="{Binding BorderThickness, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                CornerRadius="4"
+                                                SnapsToDevicePixels="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="22"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Grid.Column="0"
+                                                                  Margin="{Binding Padding, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  HorizontalAlignment="Left"
+                                                                  VerticalAlignment="Center"
+                                                                  Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentTemplateSelector="{Binding ItemTemplateSelector, RelativeSource={RelativeSource AncestorType=ComboBox}}"/>
+                                                <Path Grid.Column="1"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Data="M 0 0 L 4 4 L 8 0 Z"
+                                                      Fill="{DynamicResource GraphFluentTextBrush}"/>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="240"
+                                        Margin="0,2,0,0"
+                                        Background="{DynamicResource GraphFluentSurfaceBrush}"
+                                        BorderBrush="{DynamicResource GraphFluentBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                    <ScrollViewer SnapsToDevicePixels="True">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GraphLangToggleButton" TargetType="Button" BasedOn="{StaticResource GraphFluentButton}">
+            <Setter Property="MinWidth" Value="36"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="GraphLangToggleButtonActive" TargetType="Button" BasedOn="{StaticResource GraphFluentAccentButton}">
+            <Setter Property="MinWidth" Value="36"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="GraphListItem" TargetType="TextBlock">
+
+            <Setter Property="FontSize" Value="12"/>
+
+            <Setter Property="TextWrapping" Value="Wrap"/>
+
+            <Setter Property="Margin" Value="0,3,0,3"/>
+
+            <Setter Property="Padding" Value="8,4"/>
+
+        </Style>
+
+        <Style x:Key="GraphSectionTitle" TargetType="TextBlock">
+
+            <Setter Property="FontSize" Value="11"/>
+
+            <Setter Property="FontWeight" Value="SemiBold"/>
+
+            <Setter Property="Margin" Value="0,14,0,6"/>
+
+            <Setter Property="Opacity" Value="0.85"/>
+
+        </Style>
+
+        <Style x:Key="GraphSidebarIconButton" TargetType="Button" BasedOn="{StaticResource GraphFluentIconButton}"/>
+
+        <Style x:Key="GraphNavLink" TargetType="Button">
+
+            <Setter Property="Background" Value="Transparent"/>
+
+            <Setter Property="BorderThickness" Value="0"/>
+
+            <Setter Property="Padding" Value="8,4"/>
+
+            <Setter Property="Margin" Value="0,2,0,2"/>
+
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+
+            <Setter Property="Cursor" Value="Hand"/>
+
+            <Setter Property="FontSize" Value="12"/>
+
+            <Setter Property="Foreground" Value="{DynamicResource SidebarLinkBrush}"/>
+
+            <Setter Property="Template">
+
+                <Setter.Value>
+
+                    <ControlTemplate TargetType="Button">
+
+                        <TextBlock x:Name="LinkText" Text="{TemplateBinding Content}"
+
+                                   TextWrapping="Wrap" TextDecorations="None"/>
+
+                        <ControlTemplate.Triggers>
+
+                            <Trigger Property="IsMouseOver" Value="True">
+
+                                <Setter TargetName="LinkText" Property="TextDecorations" Value="Underline"/>
+
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+
+                </Setter.Value>
+
+            </Setter>
+
+        </Style>
+
+    </UserControl.Resources>
+
+
+
+    <Grid>
+
+        <Grid.RowDefinitions>
+
+            <RowDefinition Height="Auto"/>
+
+            <RowDefinition Height="*"/>
+
+        </Grid.RowDefinitions>
+
+
+
+        <Border x:Name="HeaderBorder" Grid.Row="0" BorderThickness="0,0,0,1" Padding="12,10">
+
+            <Grid>
+
+                <Grid.ColumnDefinitions>
+
+                    <ColumnDefinition Width="Auto"/>
+
+                    <ColumnDefinition Width="*"/>
+
+                    <ColumnDefinition Width="Auto"/>
+
+                </Grid.ColumnDefinitions>
+
+
+
+                <Border Width="32" Height="32" Margin="0,0,10,0" VerticalAlignment="Center"
+
+                        CornerRadius="4"
+
+                        Background="{DynamicResource GraphFluentSurfaceBrush}"
+
+                        BorderBrush="{DynamicResource GraphFluentBorderBrush}"
+
+                        BorderThickness="1">
+
+                    <Image x:Name="HeaderIcon" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                </Border>
+
+                <StackPanel Grid.Column="1" Orientation="Vertical" VerticalAlignment="Center">
+
+                    <TextBlock x:Name="TitleText" Text="Dotnet Graph" FontSize="13" FontWeight="SemiBold"
+
+                               FontFamily="Segoe UI Variable, Segoe UI, sans-serif"/>
+
+                    <TextBlock x:Name="SolutionLabel" Margin="0,2,0,0" FontSize="11" TextWrapping="Wrap"/>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
+
+                        <TextBlock x:Name="LanguageLabel" Text="Idioma" VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                        <Button x:Name="LangBrButton" Style="{StaticResource GraphLangToggleButton}" Content="BR"
+
+                                Margin="0,0,2,0" Click="LangBrButton_OnClick"/>
+
+                        <Button x:Name="LangEnButton" Style="{StaticResource GraphLangToggleButton}" Content="EN"
+
+                                Margin="0,0,2,0" Click="LangEnButton_OnClick"/>
+
+                        <Button x:Name="LangEsButton" Style="{StaticResource GraphLangToggleButton}" Content="ES"
+
+                                Click="LangEsButton_OnClick"/>
+
+                    </StackPanel>
+
+                </StackPanel>
+
+
+
+                <StackPanel x:Name="HeaderActionsPanel" Grid.Column="2" Orientation="Horizontal"
+
+                            VerticalAlignment="Center" HorizontalAlignment="Right">
+
+                    <Button x:Name="ShowArchitectureButton" Style="{StaticResource GraphFluentButton}" Content="Arquitetura"
+
+                            Click="ShowArchitectureButton_OnClick"/>
+
+                    <Button x:Name="ShowCallGraphButton" Style="{StaticResource GraphFluentButton}" Content="Call Graph" IsEnabled="False"
+
+                            Click="ShowCallGraphButton_OnClick"/>
+
+                    <Button x:Name="ShowNamespaceMapButton" Style="{StaticResource GraphFluentButton}" Content="Namespaces" IsEnabled="False"
+
+                            Click="ShowNamespaceMapButton_OnClick"/>
+
+                    <Border Width="1" Height="24" Margin="10,0" VerticalAlignment="Center"
+
+                            Background="{DynamicResource GraphFluentBorderBrush}"/>
+
+                    <TextBlock x:Name="ThemeLabel" Text="Tema" VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                    <ComboBox x:Name="ThemeComboBox" MinWidth="112" Style="{StaticResource GraphFluentComboBox}"
+
+                              SelectionChanged="ThemeComboBox_OnSelectionChanged">
+
+                        <ComboBoxItem Content="Sistema" Tag="System"/>
+
+                        <ComboBoxItem Content="Claro" Tag="Light"/>
+
+                        <ComboBoxItem Content="Escuro" Tag="Dark"/>
+
+                    </ComboBox>
+
+                    <Button x:Name="RefreshButton" Style="{StaticResource GraphFluentAccentButton}" Margin="8,0,0,0"
+
+                            Content="Atualizar" Click="RefreshButton_OnClick"/>
+
+                </StackPanel>
+
+            </Grid>
+
+        </Border>
+
+
+
+        <Grid Grid.Row="1">
+
+            <Grid.ColumnDefinitions>
+
+                <ColumnDefinition Width="*"/>
+
+                <ColumnDefinition x:Name="DetailSplitterColumn" Width="0"/>
+
+                <ColumnDefinition x:Name="DetailColumn" Width="0"/>
+
+            </Grid.ColumnDefinitions>
+
+
+
+            <Border x:Name="GraphHostBorder" Grid.Column="0" Grid.ColumnSpan="3">
+
+                <Grid x:Name="GraphWebViewHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+
+            </Border>
+
+
+
+            <GridSplitter x:Name="DetailSplitter" Grid.Column="1" Width="4" Panel.ZIndex="2"
+
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+
+                          ResizeDirection="Columns" ShowsPreview="True"
+
+                          Visibility="Collapsed" DragCompleted="DetailSplitter_OnDragCompleted"/>
+
+
+
+            <Border x:Name="DetailPanel" Grid.Column="2" BorderThickness="1,0,0,0"
+
+                    Visibility="Collapsed" Panel.ZIndex="2">
+
+                <Grid Margin="0">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="Auto"/>
+
+                        <RowDefinition Height="*"/>
+
+                    </Grid.RowDefinitions>
+
+
+
+                    <Border x:Name="DetailHeaderBorder" Grid.Row="0" Padding="14,12" BorderThickness="0,0,0,1">
+
+                        <Grid>
+
+                            <Grid.ColumnDefinitions>
+
+                                <ColumnDefinition Width="*"/>
+
+                                <ColumnDefinition Width="Auto"/>
+
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+
+                                <TextBlock x:Name="DetailTitle" FontSize="14" FontWeight="SemiBold"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+
+                                    <Border x:Name="DetailLanguageBadge" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+
+                                        <TextBlock x:Name="DetailLanguageLabel" FontSize="11" FontWeight="SemiBold"/>
+
+                                    </Border>
+
+                                    <TextBlock x:Name="DetailMeta" TextWrapping="Wrap" FontSize="11" VerticalAlignment="Center"/>
+
+                                </StackPanel>
+
+                            </StackPanel>
+
+                            <Button x:Name="CloseDetailButton" Grid.Column="1" Style="{StaticResource GraphFluentIconButton}"
+
+                                    Content="&#xE711;"
+
+                                    ToolTip="Fechar painel" Click="CloseDetailButton_OnClick"/>
+
+                        </Grid>
+
+                    </Border>
+
+
+
+                    <Grid Grid.Row="1">
+
+                        <StackPanel x:Name="DetailLoadingPanel" Visibility="Collapsed"
+
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+
+                            <ProgressBar x:Name="DetailLoadingProgress" IsIndeterminate="True" Width="160" Height="4"/>
+
+                            <TextBlock x:Name="DetailLoadingText" Text="Carregando detalhes..." Margin="0,10,0,0"
+
+                                       HorizontalAlignment="Center" FontSize="12"/>
+
+                        </StackPanel>
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,0,14,14">
+
+                            <StackPanel x:Name="DetailContentPanel">
+
+                                <StackPanel x:Name="CircularDependencyPanel" Visibility="Collapsed" Margin="0,0,0,8">
+
+                                    <TextBlock x:Name="CircularDependencyTitle" Text="⚠ Circular dependency detected"
+
+                                               FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="Path:" Style="{StaticResource GraphSectionTitle}" Margin="0,0,0,4"/>
+
+                                    <ItemsControl x:Name="CircularDependencyCyclesList">
+
+                                        <ItemsControl.ItemTemplate>
+
+                                            <DataTemplate DataType="{x:Type local:DetailCycleItem}">
+
+                                                <Border Margin="0,0,0,12" Padding="10,8" BorderThickness="1" CornerRadius="4"
+
+                                                        x:Name="CycleItemBorder">
+
+                                                    <StackPanel>
+
+                                                        <TextBlock Text="{Binding PathDisplay}" FontFamily="Consolas, Courier New"
+
+                                                                   FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                                                        <Button Content="Destacar no grafo" Tag="{Binding Index}"
+
+                                                                Style="{StaticResource GraphFluentButton}"
+
+                                                                Click="HighlightCycleButton_OnClick"
+
+                                                                HorizontalAlignment="Left" FontSize="11"/>
+
+                                                    </StackPanel>
+
+                                                </Border>
+
+                                            </DataTemplate>
+
+                                        </ItemsControl.ItemTemplate>
+
+                                    </ItemsControl>
+
+                                </StackPanel>
+
+                                <StackPanel Margin="0,14,0,6">
+
+                                    <TextBlock x:Name="SectionProjectRefs" Text="REFERÊNCIAS DE PROJETO"
+
+                                               Style="{StaticResource GraphSectionTitle}" Margin="0,0,0,4"/>
+
+                                    <StackPanel Orientation="Horizontal">
+
+                                        <Button x:Name="CopyProjectRefsButton" Style="{StaticResource GraphSidebarIconButton}"
+
+                                                Content="&#xE8C8;" Margin="0,0,4,0"
+
+                                                Click="CopyProjectRefsButton_OnClick"/>
+
+                                        <Button x:Name="ExportProjectRefsButton" Style="{StaticResource GraphSidebarIconButton}"
+
+                                                Content="&#xE74E;"
+
+                                                Click="ExportProjectRefsButton_OnClick"/>
+
+                                    </StackPanel>
+
+                                </StackPanel>
+
+                                <ItemsControl x:Name="ProjectReferencesList">
+
+                                    <ItemsControl.ItemTemplate>
+
+                                        <DataTemplate>
+
+                                            <TextBlock Text="{Binding}" Style="{StaticResource GraphListItem}"/>
+
+                                        </DataTemplate>
+
+                                    </ItemsControl.ItemTemplate>
+
+                                </ItemsControl>
+
+                                <TextBlock x:Name="SectionPackages" Text="PACOTES NUGET"
+
+                                           Style="{StaticResource GraphSectionTitle}"/>
+
+                                <ItemsControl x:Name="PackageReferencesList">
+
+                                    <ItemsControl.ItemTemplate>
+
+                                        <DataTemplate>
+
+                                            <TextBlock Text="{Binding}" Style="{StaticResource GraphListItem}"/>
+
+                                        </DataTemplate>
+
+                                    </ItemsControl.ItemTemplate>
+
+                                </ItemsControl>
+
+                                <TextBlock x:Name="SectionTypes" Text="TIPOS / MÓDULOS"
+
+                                           Style="{StaticResource GraphSectionTitle}"/>
+
+                                <TextBlock x:Name="SectionCallMethods" Text="MÉTODOS (CALL GRAPH)"
+
+                                           Style="{StaticResource GraphSectionTitle}" Visibility="Collapsed"/>
+
+                                <TextBlock x:Name="SectionSourceFiles" Text="ARQUIVOS DO CLUSTER"
+
+                                           Style="{StaticResource GraphSectionTitle}" Visibility="Collapsed"/>
+
+                                <ItemsControl x:Name="SourceFilesList" Visibility="Collapsed">
+
+                                    <ItemsControl.ItemTemplate>
+
+                                        <DataTemplate>
+
+                                            <TextBlock Text="{Binding}" Style="{StaticResource GraphListItem}"/>
+
+                                        </DataTemplate>
+
+                                    </ItemsControl.ItemTemplate>
+
+                                </ItemsControl>
+
+                                <ItemsControl x:Name="TypesList">
+
+                                    <ItemsControl.ItemTemplate>
+
+                                        <DataTemplate DataType="{x:Type local:DetailLinkItem}">
+
+                                            <Grid>
+
+                                                <TextBlock Text="{Binding DisplayText}">
+
+                                                    <TextBlock.Style>
+
+                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource GraphListItem}">
+
+                                                            <Setter Property="Visibility" Value="Visible"/>
+
+                                                            <Style.Triggers>
+
+                                                                <DataTrigger Binding="{Binding IsNavigable}" Value="True">
+
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+
+                                                                </DataTrigger>
+
+                                                            </Style.Triggers>
+
+                                                        </Style>
+
+                                                    </TextBlock.Style>
+
+                                                </TextBlock>
+
+                                                <Button Content="{Binding DisplayText}" Tag="{Binding}"
+
+                                                        Click="TypeLink_OnClick">
+
+                                                    <Button.Style>
+
+                                                        <Style TargetType="Button" BasedOn="{StaticResource GraphNavLink}">
+
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+
+                                                            <Style.Triggers>
+
+                                                                <DataTrigger Binding="{Binding IsNavigable}" Value="True">
+
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+
+                                                                </DataTrigger>
+
+                                                            </Style.Triggers>
+
+                                                        </Style>
+
+                                                    </Button.Style>
+
+                                                </Button>
+
+                                            </Grid>
+
+                                        </DataTemplate>
+
+                                    </ItemsControl.ItemTemplate>
+
+                                </ItemsControl>
+
+                            </StackPanel>
+
+                        </ScrollViewer>
+
+                    </Grid>
+
+                </Grid>
+
+            </Border>
+
+
+
+            <Border x:Name="LoadingOverlay" Grid.ColumnSpan="3" Visibility="Collapsed" Panel.ZIndex="4"
+
+                    Opacity="0.94">
+
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+
+                    <ProgressBar x:Name="OverlayProgress" IsIndeterminate="True" Width="220" Height="4"/>
+
+                    <TextBlock x:Name="LoadingText" Text="Analisando solução..."
+
+                               FontSize="13" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </Grid>
+
+</UserControl>

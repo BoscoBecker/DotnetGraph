@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+
+
+  <Extern href="stdidcmd.h"/>
+
+  <Extern href="vsshlids.h"/>
+
+
+
+  <Commands package="guidDotnetGraphPackage">
+
+    <Groups>
+
+      <Group guid="guidDotnetGraphCommandSet" id="DotnetGraphMenuGroup" priority="0x0600">
+
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_VIEW"/>
+
+      </Group>
+
+      <Group guid="guidDotnetGraphCommandSet" id="DotnetGraphSolutionGroup" priority="0x0600">
+
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_SOLNNODE"/>
+
+      </Group>
+
+    </Groups>
+
+
+
+    <Buttons>
+
+      <Button guid="guidDotnetGraphCommandSet" id="cmdidShowDependencyGraph" priority="0x0100" type="Button">
+
+        <Parent guid="guidDotnetGraphCommandSet" id="DotnetGraphMenuGroup"/>
+
+        <Icon guid="guidDotnetGraphImages" id="bmpGraph16"/>
+
+        <Strings>
+
+          <ButtonText>Dotnet Graph</ButtonText>
+
+          <CommandName>DotnetGraph.ShowGraph</CommandName>
+
+        </Strings>
+
+      </Button>
+
+    </Buttons>
+
+
+
+    <Bitmaps>
+
+      <Bitmap guid="guidDotnetGraphImages" href="Resources\Icons\CommandGraphIcons.png" UsedList="1;2"/>
+
+    </Bitmaps>
+
+
+
+  </Commands>
+
+
+
+  <CommandPlacements>
+
+    <CommandPlacement guid="guidDotnetGraphCommandSet" id="cmdidShowDependencyGraph" priority="0x0100">
+
+      <Parent guid="guidDotnetGraphCommandSet" id="DotnetGraphSolutionGroup"/>
+
+    </CommandPlacement>
+
+  </CommandPlacements>
+
+
+
+  <Symbols>
+
+    <GuidSymbol name="guidDotnetGraphPackage" value="{c8f4e2a1-9b3d-4f6e-a5c7-1d2e3f4a5b6c}"/>
+
+    <GuidSymbol name="guidDotnetGraphCommandSet" value="{d9a5f3b2-0c4e-5a7f-b6d8-2e3f4a5b6c7d}">
+
+      <IDSymbol name="DotnetGraphMenuGroup" value="0x1020"/>
+
+      <IDSymbol name="DotnetGraphSolutionGroup" value="0x1021"/>
+
+      <IDSymbol name="cmdidShowDependencyGraph" value="0x0100"/>
+
+    </GuidSymbol>
+
+    <GuidSymbol name="guidDotnetGraphImages" value="{f2c8a1b3-6d4e-4f90-9a2b-1c3d4e5f6071}">
+
+      <IDSymbol name="bmpGraph16" value="1"/>
+
+    </GuidSymbol>
+
+  </Symbols>
+
+</CommandTable>
+

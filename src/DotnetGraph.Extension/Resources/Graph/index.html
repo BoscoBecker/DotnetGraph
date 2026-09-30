@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+
+<head>
+
+  <meta charset="utf-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Dotnet Graph</title>
+
+  <link rel="stylesheet" href="graph.css" />
+
+</head>
+
+<body>
+
+  <div id="toolbar">
+
+    <span id="hint">Arquitetura · Call Graph (círculo + métodos) · Namespaces (clusters) — selecione um projeto C#</span>
+
+    <div id="legend">
+
+      <span class="badge cs">C#</span>
+
+      <span class="badge fs">F#</span>
+
+      <span class="badge vb">VB</span>
+
+    </div>
+
+  </div>
+
+  <canvas id="graphCanvas"></canvas>
+
+  <div id="statusBar">
+
+    <span id="statusSummary">Nenhum grafo carregado</span>
+
+    <span id="statusSelection"></span>
+
+  </div>
+
+  <script src="graph.js"></script>
+
+</body>
+
+</html>
+

@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Authors>DotnetGraph</Authors>
+    <Company>DotnetGraph</Company>
+    <Copyright>Copyright © DotnetGraph</Copyright>
+  </PropertyGroup>
+</Project>
