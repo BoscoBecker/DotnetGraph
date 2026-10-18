@@ -38,13 +38,17 @@ public partial class DependencyGraphControl : UserControl
     private string? _lastNamespaceProjectName;
     private CircularDependencyReport _circularDependencyReport = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private int _refreshQueued;
     private SolutionGraph? _currentGraph;
     private string? _selectedProjectId;
     private string? _callGraphRootType;
     private int _detailRequestVersion;
     private IReadOnlyList<ReferencedProjectInfo> _currentProjectReferences = Array.Empty<ReferencedProjectInfo>();
     private string _currentDetailProjectName = string.Empty;
-    private bool _webViewReady;
+    private bool _webViewCoreReady;
+    private bool _webViewPageReady;
+    private TaskCompletionSource<bool> _webViewPageReadyTcs =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private WebView2? _graphWebView;
     private GraphThemePreference _themePreference;
     private bool _vsThemeHooked;
@@ -66,6 +70,9 @@ public partial class DependencyGraphControl : UserControl
         TypeGraph,
         ImpactGraph
     }
+
+    private bool IsWebViewInteractive =>
+        _webViewCoreReady && _webViewPageReady && _graphWebView?.CoreWebView2 is not null;
 
     public DependencyGraphControl()
     {
@@ -181,7 +188,7 @@ public partial class DependencyGraphControl : UserControl
 
         UserGraphSettings.SaveUiLanguage(language);
         ApplyLocalizedUi();
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+        QueueUiWork(async () =>
         {
             await PushLocaleToWebViewAsync();
             await RefreshLocalizedGraphViewAsync();
@@ -215,7 +222,7 @@ public partial class DependencyGraphControl : UserControl
 
     private void OnVsThemeChanged(ThemeChangedEventArgs e)
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+        QueueUiWork(async () =>
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
             ApplyChromeTheme();
@@ -318,10 +325,7 @@ public partial class DependencyGraphControl : UserControl
     {
         if (_graphWebView?.CoreWebView2 is null || _currentGraph is null)
         {
-            ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-            {
-                await ShowStatusSafeAsync(GraphLocalizer.T("GraphExportEmpty"));
-            });
+            QueueUiWork(async () => await ShowStatusSafeAsync(GraphLocalizer.T("GraphExportEmpty")));
             return;
         }
 
@@ -332,7 +336,7 @@ public partial class DependencyGraphControl : UserControl
 
     private void UpdateGraphExportButtonsEnabled(bool enabled)
     {
-        var ok = enabled && _webViewReady && _currentGraph is not null;
+        var ok = enabled && IsWebViewInteractive && _currentGraph is not null;
         ExportPngButton.IsEnabled = ok;
         ExportMermaidButton.IsEnabled = ok;
     }
@@ -416,26 +420,17 @@ public partial class DependencyGraphControl : UserControl
             WhoUsesButton.IsEnabled = true;
         }
 
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await OpenSourceFileAsync(item.FilePath!, item.Line);
-        });
+        QueueUiWork(async () => await OpenSourceFileAsync(item.FilePath!, item.Line));
     }
 
     private void WhoUsesButton_OnClick(object sender, RoutedEventArgs e)
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await RunImpactAnalysisAsync();
-        });
+        QueueUiWork(RunImpactAnalysisAsync);
     }
 
     private void ShowTypeGraphButton_OnClick(object sender, RoutedEventArgs e)
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await ShowTypeGraphAsync();
-        });
+        QueueUiWork(ShowTypeGraphAsync);
     }
 
     private void SolutionScopeComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -453,17 +448,11 @@ public partial class DependencyGraphControl : UserControl
         _architectureScopeFilter = item.Tag?.ToString();
         if (_activeGraphView != ActiveGraphView.Architecture)
         {
-            ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-            {
-                await ShowStatusSafeAsync(GraphLocalizer.T("StatusScopeArchitectureOnly"));
-            });
+            QueueUiWork(async () => await ShowStatusSafeAsync(GraphLocalizer.T("StatusScopeArchitectureOnly")));
             return;
         }
 
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await PushArchitectureGraphAsync();
-        });
+        QueueUiWork(PushArchitectureGraphAsync);
     }
 
     private void CloseDetailButton_OnClick(object sender, RoutedEventArgs e)
@@ -473,26 +462,17 @@ public partial class DependencyGraphControl : UserControl
 
     private void ShowArchitectureButton_OnClick(object sender, RoutedEventArgs e)
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await ShowArchitectureGraphAsync();
-        });
+        QueueUiWork(ShowArchitectureGraphAsync);
     }
 
     private void ShowCallGraphButton_OnClick(object sender, RoutedEventArgs e)
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await ShowCallGraphAsync();
-        });
+        QueueUiWork(ShowCallGraphAsync);
     }
 
     private void ShowNamespaceMapButton_OnClick(object sender, RoutedEventArgs e)
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await ShowNamespaceMapAsync();
-        });
+        QueueUiWork(ShowNamespaceMapAsync);
     }
 
     private async Task ShowArchitectureGraphAsync()
@@ -509,18 +489,24 @@ public partial class DependencyGraphControl : UserControl
 
     private async Task PushArchitectureGraphAsync()
     {
-        if (_currentGraph is null || _graphWebView?.CoreWebView2 is null)
+        if (_currentGraph is null)
         {
             return;
         }
 
+        await EnsureWebViewCanReceiveMessagesAsync().ConfigureAwait(true);
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        if (_graphWebView?.CoreWebView2 is null)
+        {
+            return;
+        }
+
         var filtered = FilterGraphByScope(_currentGraph, _architectureScopeFilter);
         var scopedCycles = CircularDependencyDetector.Analyze(filtered);
         var payload = GraphWebPayload.WithLayout(
             GraphJsonSerializer.SerializeSolutionGraph(filtered, scopedCycles),
             ArchitectureLayoutKey(_currentSolutionPath));
-        _graphWebView.CoreWebView2.PostWebMessageAsString(payload);
+        _graphWebView!.CoreWebView2.PostWebMessageAsString(payload);
         UpdateArchitectureScopeLabel(filtered, scopedCycles);
 
         if (filtered.Projects.Count == 0 && !string.IsNullOrWhiteSpace(_architectureScopeFilter))
@@ -905,10 +891,7 @@ public partial class DependencyGraphControl : UserControl
 
     public void RequestRefresh()
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await RefreshGraphAsync();
-        });
+        QueueUiWork(RefreshGraphAsync);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -920,10 +903,7 @@ public partial class DependencyGraphControl : UserControl
             _vsThemeHooked = true;
         }
 
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await LoadInitialAsync();
-        });
+        QueueUiWork(LoadInitialAsync);
     }
 
     private async Task LoadInitialAsync()
@@ -970,7 +950,7 @@ public partial class DependencyGraphControl : UserControl
             return;
         }
 
-        if (_webViewReady && _graphWebView.CoreWebView2 is not null)
+        if (_webViewCoreReady && _webViewPageReady && _graphWebView.CoreWebView2 is not null)
         {
             return;
         }
@@ -981,22 +961,70 @@ public partial class DependencyGraphControl : UserControl
         _graphWebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
         _graphWebView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
         _graphWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+        _graphWebView.CoreWebView2.NavigationCompleted -= OnWebViewNavigationCompleted;
+        _graphWebView.CoreWebView2.NavigationCompleted += OnWebViewNavigationCompleted;
         _graphWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
             "dotnetgraph.local",
             graphFolder,
             CoreWebView2HostResourceAccessKind.Allow);
-        _graphWebView.Source = new Uri("https://dotnetgraph.local/index.html");
-        _webViewReady = true;
+
+        if (!_webViewPageReady)
+        {
+            _webViewPageReadyTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _graphWebView.Source = new Uri("https://dotnetgraph.local/index.html");
+        }
+
+        _webViewCoreReady = true;
+        await WaitForWebViewPageReadyAsync().ConfigureAwait(true);
         await PushThemeToWebViewAsync();
         await PushLocaleToWebViewAsync();
     }
 
+    private void OnWebViewNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        if (e.IsSuccess)
+        {
+            // Do not mark ready here — wait for JS "webReady" so the message listener exists.
+            return;
+        }
+
+        _webViewPageReadyTcs.TrySetException(
+            new InvalidOperationException($"Falha ao carregar a visualização do grafo (0x{e.WebErrorStatus:X})."));
+    }
+
+    private async Task WaitForWebViewPageReadyAsync()
+    {
+        if (_webViewPageReady)
+        {
+            return;
+        }
+
+        // TCS is completed from the WebView message callback (different context by design).
+#pragma warning disable VSTHRD003
+        var finished = await Task.WhenAny(_webViewPageReadyTcs.Task, Task.Delay(TimeSpan.FromSeconds(30)))
+            .ConfigureAwait(true);
+        if (finished != _webViewPageReadyTcs.Task)
+        {
+            throw new TimeoutException("A visualização do grafo não ficou pronta a tempo.");
+        }
+
+        await _webViewPageReadyTcs.Task.ConfigureAwait(true);
+#pragma warning restore VSTHRD003
+    }
+
+    private async Task EnsureWebViewCanReceiveMessagesAsync()
+    {
+        if (!_webViewCoreReady || _graphWebView?.CoreWebView2 is null || !_webViewPageReady)
+        {
+            await InitializeWebViewAsync().ConfigureAwait(true);
+        }
+
+        await WaitForWebViewPageReadyAsync().ConfigureAwait(true);
+    }
+
     private void RefreshButton_OnClick(object sender, RoutedEventArgs e)
     {
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await RefreshGraphAsync();
-        });
+        QueueUiWork(RefreshGraphAsync);
     }
 
     private void ThemeComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1016,17 +1044,35 @@ public partial class DependencyGraphControl : UserControl
 
         UserGraphSettings.SaveTheme(_themePreference);
         ApplyChromeTheme();
-        ThreadHelper.JoinableTaskFactory.RunAsync(PushThemeToWebViewAsync);
+        QueueUiWork(PushThemeToWebViewAsync);
     }
 
     private async Task RefreshGraphAsync()
     {
         if (!await _refreshGate.WaitAsync(0))
         {
+            Interlocked.Exchange(ref _refreshQueued, 1);
             await ShowStatusSafeAsync(GraphLocalizer.T("StatusAnalysisInProgress"));
             return;
         }
 
+        try
+        {
+            do
+            {
+                Interlocked.Exchange(ref _refreshQueued, 0);
+                await RefreshGraphCoreAsync().ConfigureAwait(true);
+            }
+            while (Interlocked.Exchange(ref _refreshQueued, 0) == 1);
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+    }
+
+    private async Task RefreshGraphCoreAsync()
+    {
         try
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -1034,17 +1080,14 @@ public partial class DependencyGraphControl : UserControl
             RefreshButton.IsEnabled = false;
             UpdateGraphExportButtonsEnabled(false);
 
-            if (!_webViewReady)
+            try
             {
-                try
-                {
-                    await InitializeWebViewAsync();
-                }
-                catch (Exception webEx)
-                {
-                    await ShowStatusSafeAsync(GraphLocalizer.Format("StatusWebViewUnavailable", FormatUserError(webEx)));
-                    return;
-                }
+                await EnsureWebViewCanReceiveMessagesAsync().ConfigureAwait(true);
+            }
+            catch (Exception webEx)
+            {
+                await ShowStatusSafeAsync(GraphLocalizer.Format("StatusWebViewUnavailable", FormatUserError(webEx)));
+                return;
             }
 
             var dte = await GetDteAsync();
@@ -1057,19 +1100,38 @@ public partial class DependencyGraphControl : UserControl
 
             var solutionPath = dte.Solution.FullName;
             _currentSolutionPath = solutionPath;
-            var solutionName = Path.GetFileName(solutionPath);
+            var solutionName = string.IsNullOrWhiteSpace(solutionPath)
+                ? (dte.Solution.Properties?.Item("Name")?.Value?.ToString() ?? "Solution")
+                : Path.GetFileName(solutionPath);
             var projects = SolutionProjectCollector.CollectFromDte(dte);
 
             await Task.Run(() =>
             {
-                _currentGraph = _graphService.Value.BuildFromProjects(solutionPath, projects);
+                if (projects.Count > 0)
+                {
+                    _currentGraph = _graphService.Value.BuildFromProjects(solutionPath, projects);
+                }
+                else if (!string.IsNullOrWhiteSpace(solutionPath) && File.Exists(solutionPath))
+                {
+                    // DTE sometimes returns no projects (CPS/timing); fall back to parsing the .sln.
+                    _currentGraph = _graphService.Value.BuildFromSolutionFile(solutionPath);
+                }
+                else
+                {
+                    _currentGraph = new SolutionGraph
+                    {
+                        SolutionPath = solutionPath ?? string.Empty,
+                        Projects = Array.Empty<ProjectNode>(),
+                        References = Array.Empty<ProjectReferenceEdge>()
+                    };
+                }
+
                 _circularDependencyReport = _currentGraph is not null
                     ? CircularDependencyDetector.Analyze(_currentGraph)
                     : new CircularDependencyReport();
             }).ConfigureAwait(true);
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            await ShowStatusSafeAsync(solutionName);
 
             if (_currentGraph is null)
             {
@@ -1077,7 +1139,7 @@ public partial class DependencyGraphControl : UserControl
                 return;
             }
 
-            if (!_webViewReady || _graphWebView?.CoreWebView2 is null)
+            if (!IsWebViewInteractive)
             {
                 await ShowStatusSafeAsync(GraphLocalizer.Format("StatusWebViewNotReady", solutionName));
                 return;
@@ -1096,6 +1158,11 @@ public partial class DependencyGraphControl : UserControl
             await PushThemeToWebViewAsync();
             await PushLocaleToWebViewAsync();
 
+            if (_currentGraph.Projects.Count == 0)
+            {
+                await ShowStatusSafeAsync(GraphLocalizer.T("StatusNoProjectsInSolution"));
+            }
+
             if (!_circularDependencyReport.HasCycles)
             {
                 CloseDetailSidebar();
@@ -1107,8 +1174,6 @@ public partial class DependencyGraphControl : UserControl
         }
         finally
         {
-            _refreshGate.Release();
-
             try
             {
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -1118,7 +1183,7 @@ public partial class DependencyGraphControl : UserControl
             }
             catch
             {
-                // Semaphore already released — avoids blocking Refresh after an HRESULT on the UI thread.
+                // Ignore COM/UI failures when closing VS.
             }
         }
     }
@@ -1126,20 +1191,20 @@ public partial class DependencyGraphControl : UserControl
     private async Task PushThemeToWebViewAsync()
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        if (!_webViewReady || _graphWebView?.CoreWebView2 is null)
+        if (!IsWebViewInteractive)
         {
             return;
         }
 
         var theme = GraphThemeService.ResolveWebTheme(_themePreference);
         var message = JsonSerializer.Serialize(new { type = "setTheme", theme });
-        _graphWebView.CoreWebView2.PostWebMessageAsString(message);
+        _graphWebView!.CoreWebView2.PostWebMessageAsString(message);
     }
 
     private async Task PushLocaleToWebViewAsync()
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        if (!_webViewReady || _graphWebView?.CoreWebView2 is null)
+        if (!IsWebViewInteractive)
         {
             return;
         }
@@ -1149,13 +1214,13 @@ public partial class DependencyGraphControl : UserControl
             type = "setLocale",
             strings = GraphLocalizer.WebStrings()
         });
-        _graphWebView.CoreWebView2.PostWebMessageAsString(message);
+        _graphWebView!.CoreWebView2.PostWebMessageAsString(message);
     }
 
     private async Task RefreshLocalizedGraphViewAsync()
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        if (!_webViewReady || _graphWebView?.CoreWebView2 is null)
+        if (!IsWebViewInteractive)
         {
             return;
         }
@@ -1176,7 +1241,7 @@ public partial class DependencyGraphControl : UserControl
                     var payload = GraphWebPayload.WithLayout(
                         GraphJsonSerializer.SerializeCallGraph(localized),
                         CallGraphLayoutKey(projectId));
-                    _graphWebView.CoreWebView2.PostWebMessageAsString(payload);
+                    _graphWebView!.CoreWebView2.PostWebMessageAsString(payload);
                     ShowCallGraphInSidebar(localized, _currentDetailProjectName);
                 }
 
@@ -1188,7 +1253,7 @@ public partial class DependencyGraphControl : UserControl
                 var payload = GraphWebPayload.WithLayout(
                     GraphJsonSerializer.SerializeNamespaceMap(localized),
                     NamespaceMapLayoutKey(_selectedProjectId));
-                _graphWebView.CoreWebView2.PostWebMessageAsString(payload);
+                _graphWebView!.CoreWebView2.PostWebMessageAsString(payload);
                 break;
             }
             case ActiveGraphView.TypeGraph when _lastTypeGraph is not null && !string.IsNullOrWhiteSpace(_selectedProjectId):
@@ -1197,7 +1262,7 @@ public partial class DependencyGraphControl : UserControl
                 var payload = GraphWebPayload.WithLayout(
                     GraphJsonSerializer.SerializeTypeGraph(localized),
                     TypeGraphLayoutKey(_selectedProjectId));
-                _graphWebView.CoreWebView2.PostWebMessageAsString(payload);
+                _graphWebView!.CoreWebView2.PostWebMessageAsString(payload);
                 break;
             }
             case ActiveGraphView.ImpactGraph when _lastImpactAnalysis is not null:
@@ -1206,7 +1271,7 @@ public partial class DependencyGraphControl : UserControl
                 var payload = GraphWebPayload.WithLayout(
                     GraphJsonSerializer.SerializeImpactAnalysis(localized),
                     ArchitectureLayoutKey(_currentSolutionPath));
-                _graphWebView.CoreWebView2.PostWebMessageAsString(payload);
+                _graphWebView!.CoreWebView2.PostWebMessageAsString(payload);
                 SolutionLabel.Text = string.Format(GraphLocalizer.T("ViewImpact"), localized.SymbolLabel);
                 ShowImpactInSidebar(localized);
                 break;
@@ -1222,10 +1287,48 @@ public partial class DependencyGraphControl : UserControl
             return;
         }
 
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+        // Complete page-ready synchronously so WaitForWebViewPageReadyAsync cannot deadlock
+        // behind a queued JoinableTask while Refresh is awaiting the TCS.
+        if (TryHandleWebReadyMessage(message!))
         {
-            await HandleWebMessageAsync(message!);
-        }).Task.Forget();
+            QueueUiWork(async () =>
+            {
+                if (_currentGraph is not null && _activeGraphView == ActiveGraphView.Architecture)
+                {
+                    await PushArchitectureGraphAsync().ConfigureAwait(true);
+                    await PushThemeToWebViewAsync().ConfigureAwait(true);
+                    await PushLocaleToWebViewAsync().ConfigureAwait(true);
+                }
+            });
+            return;
+        }
+
+        QueueUiWork(async () => await HandleWebMessageAsync(message!));
+    }
+
+    private bool TryHandleWebReadyMessage(string messageJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(messageJson);
+            if (!document.RootElement.TryGetProperty("type", out var typeElement))
+            {
+                return false;
+            }
+
+            if (!string.Equals(typeElement.GetString(), "webReady", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            _webViewPageReady = true;
+            _webViewPageReadyTcs.TrySetResult(true);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private async Task HandleWebMessageAsync(string messageJson)
@@ -1493,10 +1596,8 @@ public partial class DependencyGraphControl : UserControl
             return;
         }
 
-        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-        {
-            await OpenSourceFileAsync(node.SourceFilePath!, node.SourceLine > 0 ? node.SourceLine : 1);
-        });
+        QueueUiWork(async () =>
+            await OpenSourceFileAsync(node.SourceFilePath!, node.SourceLine > 0 ? node.SourceLine : 1));
     }
 
     private void FocusCallGraphMethodInSidebar(string? nodeId)
@@ -1598,13 +1699,13 @@ public partial class DependencyGraphControl : UserControl
 
     private void PushHighlightCycleToWebView(int cycleIndex)
     {
-        if (!_webViewReady || _graphWebView?.CoreWebView2 is null)
+        if (!IsWebViewInteractive)
         {
             return;
         }
 
         var message = JsonSerializer.Serialize(new { type = "highlightCycle", cycleIndex });
-        _graphWebView.CoreWebView2.PostWebMessageAsString(message);
+        _graphWebView!.CoreWebView2.PostWebMessageAsString(message);
     }
 
     private void ShowDetail(ProjectDetail detail)
@@ -1706,23 +1807,23 @@ public partial class DependencyGraphControl : UserControl
 
     private void PushLanguageHighlightToWebView(ProjectLanguage language)
     {
-        if (!_webViewReady || _graphWebView?.CoreWebView2 is null)
+        if (!IsWebViewInteractive)
         {
             return;
         }
 
         var message = JsonSerializer.Serialize(new { type = "highlightLanguage", language = (int)language });
-        _graphWebView.CoreWebView2.PostWebMessageAsString(message);
+        _graphWebView!.CoreWebView2.PostWebMessageAsString(message);
     }
 
     private void PushClearSelectionToWebView()
     {
-        if (!_webViewReady || _graphWebView?.CoreWebView2 is null)
+        if (!IsWebViewInteractive)
         {
             return;
         }
 
-        _graphWebView.CoreWebView2.PostWebMessageAsString("{\"type\":\"clearSelection\"}");
+        _graphWebView!.CoreWebView2.PostWebMessageAsString("{\"type\":\"clearSelection\"}");
     }
 
     private void ApplyChromeTheme()
@@ -1822,6 +1923,11 @@ public partial class DependencyGraphControl : UserControl
         }
     }
 
+#pragma warning disable VSSDK007 // Fire-and-forget UI handlers; observed via FileAndForget.
+    private static void QueueUiWork(Func<Task> work) =>
+        ThreadHelper.JoinableTaskFactory.RunAsync(work).FileAndForget("DotnetGraph");
+#pragma warning restore VSSDK007
+
     private static string FormatUserError(Exception ex)
     {
         var builder = new StringBuilder();
@@ -1846,6 +1952,17 @@ public partial class DependencyGraphControl : UserControl
     private static async Task<DTE?> GetDteAsync()
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        var package = DotnetGraph.Extension.DotnetGraphPackage.Instance;
+        if (package is not null)
+        {
+            var fromPackage = await package.GetServiceAsync(typeof(DTE)).ConfigureAwait(true);
+            if (fromPackage is DTE packageDte)
+            {
+                return packageDte;
+            }
+        }
+
         return ServiceProvider.GlobalProvider.GetService(typeof(DTE)) as DTE;
     }
 

@@ -44,20 +44,46 @@
     </ProjectReference>
   </ItemGroup>
 
-  <Target Name="EnsureGraphIcons" BeforeTargets="VSCTCompile">
+  <Target Name="EnsureGraphIcons" BeforeTargets="VSCTCompile;PrepareForBuild">
     <Exec Command="&quot;$(MSBuildThisFileDirectory)..\..\scripts\ensure-icons.cmd&quot;" IgnoreExitCode="false" />
   </Target>
 
+  <!--
+    IncludeCopyLocalReferencesInVSIXContainer often skips transitive deps of ProjectReferences
+    (System.Text.Json, Roslyn, etc.). F5 works via the output folder; a standalone VSIX did not.
+    Only force-add the assemblies that were historically missing from the VSIX.
+  -->
+  <Target Name="IncludeRuntimeDependenciesInVSIX" AfterTargets="ResolveAssemblyReferences;CopyFilesToOutputDirectory" BeforeTargets="GetVsixSourceItems;CreateVsixContainer">
+    <ItemGroup>
+      <_VsixRuntimeDll Include="$(TargetDir)Microsoft.Bcl.AsyncInterfaces.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)Microsoft.CodeAnalysis.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)Microsoft.CodeAnalysis.CSharp.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)Microsoft.CodeAnalysis.VisualBasic.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Buffers.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Collections.Immutable.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Memory.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Numerics.Vectors.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Reflection.Metadata.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Text.Json.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.Threading.Tasks.Extensions.dll" />
+      <_VsixRuntimeDll Include="$(TargetDir)System.ValueTuple.dll" />
+      <VSIXSourceItem Include="@(_VsixRuntimeDll)" Condition="Exists('%(Identity)')">
+        <VSIXSubPath>.</VSIXSubPath>
+      </VSIXSourceItem>
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
+    <!-- Embedded for WPF pack:// header; also shipped as Content for VSIX Icon + Image Service. -->
     <Resource Include="Resources\Icons\PackageIcon.png" />
-    <Resource Include="Resources\Icons\CommandGraph16.png" />
-    <Resource Include="Resources\Icons\CommandGraph32.png" />
-    <Resource Include="Resources\Icons\CommandGraphIcons.png" />
+    <Content Include="Resources\Icons\*.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="DotnetGraph.imagemanifest">
       <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="Resources\Icons\**\*">
-      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Resources\Graph\**\*">
       <IncludeInVSIX>true</IncludeInVSIX>

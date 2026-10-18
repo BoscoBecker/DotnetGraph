@@ -6,5 +6,7 @@
     <Authors>João Bosco</Authors>
     <Company>DotnetGraph</Company>
     <Copyright>Copyright © DotnetGraph</Copyright>
+    <!-- Pre-existing nullable noise; CA1416 is handled per-project (IconGen is windows-only). -->
+    <NoWarn>$(NoWarn);CS8602;CS8603;CS8604</NoWarn>
   </PropertyGroup>
 </Project>
