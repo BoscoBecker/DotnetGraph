@@ -14,16 +14,10 @@ internal sealed class MsBuildProjectCache : IDisposable
 
     public MsBuildProjectCache()
     {
-        if (MsBuildHostContext.IsVisualStudioDevenv)
-        {
-            _collection = ProjectCollection.GlobalProjectCollection;
-            _ownsCollection = false;
-        }
-        else
-        {
-            _collection = new ProjectCollection();
-            _ownsCollection = true;
-        }
+        // Always use a private collection. Sharing GlobalProjectCollection with devenv from a
+        // background thread can hang or fail evaluation, leaving the architecture graph empty.
+        _collection = new ProjectCollection();
+        _ownsCollection = true;
     }
 
     public Project GetProject(string projectPath)
@@ -73,6 +67,11 @@ internal sealed class MsBuildProjectCache : IDisposable
         }
         catch (IOException)
         {
+            return false;
+        }
+        catch (Exception)
+        {
+            // MSBuild evaluation can fail for exotic/incomplete projects; callers still add nodes.
             return false;
         }
     }

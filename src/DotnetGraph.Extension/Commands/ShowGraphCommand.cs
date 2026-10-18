@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using DotnetGraph.Extension.ToolWindows;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace DotnetGraph.Extension.Commands;
@@ -31,6 +32,7 @@ internal sealed class ShowGraphCommand
 
     private void Execute(object sender, EventArgs e)
     {
+#pragma warning disable VSSDK007 // Fire-and-forget command handler; observed via FileAndForget.
         ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -47,6 +49,7 @@ internal sealed class ShowGraphCommand
             }
 
             GraphToolWindowHost.RequestRefresh();
-        });
+        }).FileAndForget("DotnetGraph/ShowGraph");
+#pragma warning restore VSSDK007
     }
 }

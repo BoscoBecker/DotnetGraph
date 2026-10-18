@@ -1932,6 +1932,8 @@
 
   if (window.chrome && window.chrome.webview) {
     window.chrome.webview.addEventListener("message", onHostMessage);
+    // Tell the host the listener is registered so graph payloads are not posted too early.
+    window.chrome.webview.postMessage(JSON.stringify({ type: "webReady" }));
   }
 
   applyTheme("light");

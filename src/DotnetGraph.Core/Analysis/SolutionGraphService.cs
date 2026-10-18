@@ -48,7 +48,15 @@ public sealed class SolutionGraphService
             var id = CreateStableId(input.FullPath);
             pathToId[input.FullPath] = id;
 
-            var msbuildProject = projectCache.GetProject(input.FullPath);
+            var targetFramework = string.Empty;
+            var outputType = string.Empty;
+            if (projectCache.TryGetProject(input.FullPath, out var msbuildProject) && msbuildProject is not null)
+            {
+                targetFramework = msbuildProject.GetPropertyValue("TargetFramework")
+                    ?? msbuildProject.GetPropertyValue("TargetFrameworks")
+                    ?? string.Empty;
+                outputType = msbuildProject.GetPropertyValue("OutputType") ?? string.Empty;
+            }
 
             nodes.Add(new ProjectNode
             {
@@ -56,10 +64,8 @@ public sealed class SolutionGraphService
                 Name = input.Name,
                 ProjectPath = input.FullPath,
                 Language = ProjectLanguageDetector.FromProjectPath(input.FullPath),
-                TargetFramework = msbuildProject.GetPropertyValue("TargetFramework")
-                    ?? msbuildProject.GetPropertyValue("TargetFrameworks")
-                    ?? string.Empty,
-                OutputType = msbuildProject.GetPropertyValue("OutputType") ?? string.Empty,
+                TargetFramework = targetFramework,
+                OutputType = outputType,
                 SolutionFolderPath = input.SolutionFolderPath ?? string.Empty
             });
         }

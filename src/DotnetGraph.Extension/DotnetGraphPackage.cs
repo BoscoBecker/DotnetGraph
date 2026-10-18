@@ -15,6 +15,7 @@ namespace DotnetGraph.Extension;
 /// Loads on demand (no startup AutoLoad). Settings I/O runs off the UI thread during <see cref="InitializeAsync"/>.
 /// </summary>
 [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
+[ProvideBindingPath]
 [Guid(PackageGuids.PackageString)]
 [ProvideMenuResource("Menus.ctmenu", 1000)]
 [ProvideToolWindow(typeof(DependencyGraphToolWindow), Style = VsDockStyle.Tabbed, Window = "DocumentWell")]
